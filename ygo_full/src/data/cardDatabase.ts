@@ -372,7 +372,7 @@ export const CARD_DATABASE: CardDefinition[] = [
     }
   },
   {
-    id: 58577036,
+    id: 9411399,
     name: 'Destiny HERO - Malicious',
     type: 'MONSTER',
     subtype: 'Effect',
@@ -383,7 +383,7 @@ export const CARD_DATABASE: CardDefinition[] = [
     def: 800,
     modelType: 'warrior',
     hasGyEffect: true,
-    art: cardArt(58577036),
+    art: cardArt(9411399),
     text: 'You can banish this card from your GY; Special Summon 1 "Destiny HERO - Malicious" from your Deck.',
     gyEffect: ({ owner, log }) => {
       const idx = owner.graveyard.findIndex(c => c.name === 'Destiny HERO - Malicious');
@@ -407,7 +407,7 @@ export const CARD_DATABASE: CardDefinition[] = [
     }
   },
   {
-    id: 48680970,
+    id: 44509529,
     name: 'Prank-Kids Rocksies',
     type: 'MONSTER',
     subtype: 'Effect',
@@ -418,7 +418,7 @@ export const CARD_DATABASE: CardDefinition[] = [
     def: 1500,
     modelType: 'rock_prank',
     hasGyEffect: true,
-    art: cardArt(48680970),
+    art: cardArt(44509529),
     text: 'If this card is sent to the GY as material for the Fusion or Link Summon of a "Prank-Kids" monster: You can banish 1 card from your hand; draw 1 card, then you can Special Summon 1 "Prank-Kids" monster from your hand or Deck in Defense Position.',
     gyEffect: ({ owner, log }) => {
       const idx = owner.graveyard.findIndex(c => c.name === 'Prank-Kids Rocksies');

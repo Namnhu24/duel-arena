@@ -1227,6 +1227,7 @@ export default function App() {
         ? (target.atk ?? 0) + (target.attackBonus || 0) 
         : (target.def ?? 0) + (target.defenseBonus || 0);
       const diff = totalAtk - targetVal;
+      const marshmallonFlipDamage = target.name === 'Marshmallon' && !target.faceUp ? 1000 : 0;
 
       setState(prev => {
         const attP = isP1 ? { ...prev.player } : { ...prev.ai };
@@ -1235,7 +1236,7 @@ export default function App() {
         const attMonster = attP.monsters.find(m => m && m.uid === attackerUid);
         if (attMonster) attMonster.hasAttacked = true;
 
-        if (diff > 0) {
+        if (diff > 0 && !target.indestructibleByBattle) {
           const tIdx = defP.monsters.findIndex(m => m && m.uid === targetUid);
           if (tIdx >= 0) {
             const dest = defP.monsters[tIdx]!;
@@ -1249,7 +1250,7 @@ export default function App() {
         } else if (diff < 0) {
           if (target.position === 'ATTACK') {
             const aIdx = attP.monsters.findIndex(m => m && m.uid === attackerUid);
-            if (aIdx >= 0) {
+            if (aIdx >= 0 && !attacker.indestructibleByBattle) {
               const dest = attP.monsters[aIdx]!;
               attP.monsters[aIdx] = null;
               attP.graveyard.push(dest);
@@ -1259,6 +1260,12 @@ export default function App() {
           } else {
             attP.lp = Math.max(0, attP.lp + diff);
           }
+        }
+
+        if (marshmallonFlipDamage > 0) {
+          attP.lp = Math.max(0, attP.lp - marshmallonFlipDamage);
+          const flipped = defP.monsters.find(m => m && m.uid === targetUid);
+          if (flipped) flipped.faceUp = true;
         }
 
         if (isOnlineMatch) {

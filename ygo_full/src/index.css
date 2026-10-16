@@ -4,9 +4,9 @@
 
 html, body, #root { min-height: 100%; margin: 0; }
 body { background: #020816; }
-.ygo-home { min-height: 100svh; height: 100svh; background: #020816; font-family: Inter, Arial, sans-serif; isolation: isolate; }
-.ygo-home-bg { position:absolute; inset:0; z-index:-2; background-image:url('/menu-dragon.png'); background-size:cover; background-position:center 48%; transform:scale(1.015); }
-.ygo-home-shade { position:absolute; inset:0; z-index:-1; background:linear-gradient(90deg,rgba(1,7,19,.84) 0%,rgba(2,10,28,.64) 32%,rgba(1,8,22,.1) 68%,rgba(1,6,17,.08) 100%),linear-gradient(0deg,rgba(1,6,16,.55),transparent 28%,transparent 80%,rgba(1,6,16,.2)); pointer-events:none; }
+.ygo-home { min-height: 100svh; height: auto; overflow-x: hidden; overflow-y: auto; background: #020816; font-family: Inter, Arial, sans-serif; isolation: isolate; }
+.ygo-home-bg { position:fixed; inset:0; z-index:-2; background-image:url('/menu-dragon.png'); background-size:cover; background-position:center 48%; transform:scale(1.015); }
+.ygo-home-shade { position:fixed; inset:0; z-index:-1; background:linear-gradient(90deg,rgba(1,7,19,.84) 0%,rgba(2,10,28,.64) 32%,rgba(1,8,22,.1) 68%,rgba(1,6,17,.08) 100%),linear-gradient(0deg,rgba(1,6,16,.55),transparent 28%,transparent 80%,rgba(1,6,16,.2)); pointer-events:none; }
 .ygo-topbar { height:68px; position:absolute; inset:0 0 auto 0; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid rgba(114,177,255,.17); background:linear-gradient(180deg,rgba(2,8,20,.72),rgba(2,8,20,.1)); padding:0 clamp(18px,4vw,64px); }
 .ygo-topline { position:absolute; width:20%; height:1px; left:0; bottom:0; background:linear-gradient(90deg,#087dff,transparent); }
 .ygo-topbar nav { display:flex; align-items:center; gap:clamp(10px,2.8vw,44px); margin-left:auto; }
@@ -14,8 +14,8 @@ body { background: #020816; }
 .ygo-nav svg { width:21px; height:21px; stroke-width:1.7; }
 .ygo-nav:hover,.ygo-nav.active { color:#fff; text-shadow:0 0 14px #168dff; }
 .ygo-nav.active:after { content:""; position:absolute; height:2px; left:0; right:0; bottom:0; background:#31aaff; box-shadow:0 0 12px #168dff; }
-.ygo-home-content { position:relative; width:min(430px,calc(100vw - 36px)); padding-top:clamp(90px,10vh,130px); margin-left:clamp(24px,6.8vw,110px); display:flex; flex-direction:column; align-items:stretch; }
-.ygo-brand { width:100%; min-height:122px; display:flex; flex-direction:column; justify-content:center; align-items:center; position:relative; margin-bottom:25px; text-align:center; filter:drop-shadow(0 0 14px rgba(39,141,255,.5)); }
+.ygo-home-content { position:relative; width:min(430px,calc(100vw - 36px)); padding-top:clamp(88px,9vh,108px); padding-bottom:112px; margin-left:clamp(24px,6.8vw,110px); display:flex; flex-direction:column; align-items:stretch; }
+.ygo-brand { width:100%; min-height:108px; display:flex; flex-direction:column; justify-content:center; align-items:center; position:relative; margin-bottom:25px; text-align:center; filter:drop-shadow(0 0 14px rgba(39,141,255,.5)); }
 .ygo-brand-emblem { color:#fff; font-family:Cinzel,Georgia,serif; font-size:clamp(28px,3.2vw,43px); font-weight:900; letter-spacing:-2px; line-height:1.05; -webkit-text-stroke:1px #0b162d; text-shadow:3px 4px 0 #a20c16,-2px -2px 0 #e8f4ff,0 0 15px #198dff; transform:rotate(-2deg); z-index:1; }
 .ygo-brand-title { font-family:Cinzel,Georgia,serif; font-weight:800; color:#e8f3ff; font-size:clamp(17px,2vw,27px); letter-spacing:-.7px; white-space:nowrap; line-height:1.25; text-shadow:0 2px 2px #00132d,0 0 9px #55aaff; z-index:1; }
 .ygo-brand-chevron { position:absolute; top:18px; left:15%; width:70%; height:100px; border:2px solid rgba(108,183,255,.9); clip-path:polygon(0 15%,100% 15%,50% 100%); filter:drop-shadow(0 0 7px #168dff); opacity:.8; }
@@ -46,7 +46,7 @@ body { background: #020816; }
 .ygo-exit-card p { color:#b5c9e7; font-size:14px; line-height:1.6; }
 .ygo-exit-card>button:last-child { padding:12px 20px; color:#fff; background:#0757a4; border:1px solid #65c9ff; cursor:pointer; }
 .ygo-exit-close { position:absolute; right:8px; top:8px; color:#bcd4f4; background:transparent; border:0; cursor:pointer; }
-@media (min-width:1200px) and (min-height:800px) { .ygo-home-content { padding-top:95px; } .ygo-brand { margin-bottom:25px; } .ygo-subtitle { margin-bottom:30px; } }
+@media (min-width:1200px) and (min-height:800px) { .ygo-home-content { padding-top:95px; } .ygo-brand { margin-bottom:16px; } .ygo-subtitle { margin-bottom:20px; } }
 @media (max-width:700px) {
  .ygo-home { height:auto; min-height:100svh; overflow-x:hidden; overflow-y:auto; }
  .ygo-home-bg { position:fixed; background-position:62% center; }
