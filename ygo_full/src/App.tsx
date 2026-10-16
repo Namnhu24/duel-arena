@@ -762,33 +762,42 @@ export default function App() {
           };
 
           if (target.position === 'DEFENSE') {
-            // DEF battles do not inflict battle damage unless the attacker has a piercing effect.
-            if (diff > 0) {
+            // Defense Position monsters are not destroyed by battle if protected.
+            if (diff > 0 && !target.indestructibleByBattle) {
               const pIdx = player.monsters.indexOf(target);
               if (pIdx >= 0) player.monsters[pIdx] = null;
               player.graveyard.push(target);
               sound.playDestroy();
             }
           } else if (diff > 0) {
-            const pIdx = player.monsters.indexOf(target);
-            if (pIdx >= 0) player.monsters[pIdx] = null;
-            player.graveyard.push(target);
+            // Battle protection must be respected by the CPU path too (e.g. Marshmallon).
+            if (!target.indestructibleByBattle) {
+              const pIdx = player.monsters.indexOf(target);
+              if (pIdx >= 0) player.monsters[pIdx] = null;
+              player.graveyard.push(target);
+              sound.playDestroy();
+            }
             player.lp = Math.max(0, player.lp - diff);
-            sound.playDestroy();
           } else if (diff < 0) {
             const aIdx = ai.monsters.indexOf(attacker);
-            if (aIdx >= 0) ai.monsters[aIdx] = null;
-            ai.graveyard.push(attacker);
+            if (aIdx >= 0 && !attacker.indestructibleByBattle) {
+              ai.monsters[aIdx] = null;
+              ai.graveyard.push(attacker);
+              sound.playDestroy();
+            }
             ai.lp = Math.max(0, ai.lp + diff);
-            sound.playDestroy();
           } else {
-            // Equal ATK destroys both Attack Position monsters.
+            // Equal ATK destroys only monsters that are not protected from battle destruction.
             const pIdx = player.monsters.indexOf(target);
             const aIdx = ai.monsters.indexOf(attacker);
-            if (pIdx >= 0) player.monsters[pIdx] = null;
-            if (aIdx >= 0) ai.monsters[aIdx] = null;
-            player.graveyard.push(target);
-            ai.graveyard.push(attacker);
+            if (pIdx >= 0 && !target.indestructibleByBattle) {
+              player.monsters[pIdx] = null;
+              player.graveyard.push(target);
+            }
+            if (aIdx >= 0 && !attacker.indestructibleByBattle) {
+              ai.monsters[aIdx] = null;
+              ai.graveyard.push(attacker);
+            }
             sound.playDestroy();
           }
         } else {

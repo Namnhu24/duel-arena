@@ -460,8 +460,31 @@ export const CARD_DATABASE: CardDefinition[] = [
     hasGyEffect: true,
     art: cardArt(557251),
     text: 'If this card is sent to the GY as material for the Fusion or Link Summon of a "Prank-Kids" monster: You can gain 1000 LP, then you can Special Summon 1 "Prank-Kids" monster from your hand or Deck in Defense Position, except "Prank-Kids Dropsies". You can only use this effect of "Prank-Kids Dropsies" once per turn.',
-    gyEffect: ({ log }) => {
-      log('[Prank-Kids Dropsies] Choose a legal Prank-Kids monster in your hand or Deck to Special Summon in Defense Position.');
+    gyEffect: ({ owner, log }) => {
+      // Resolve the trigger in this lightweight simulator: gain 1000 LP and
+      // Special Summon the first legal Prank-Kids monster from hand, then Deck.
+      owner.lp = Math.min(99999, owner.lp + 1000);
+      const isLegal = (c: CardDefinition) => c.name.startsWith('Prank-Kids') && c.name !== 'Prank-Kids Dropsies' && c.type === 'MONSTER';
+      let source: 'hand' | 'deck' | null = null;
+      let idx = owner.hand.findIndex(isLegal);
+      if (idx >= 0) source = 'hand';
+      else {
+        idx = owner.deck.findIndex(isLegal);
+        if (idx >= 0) source = 'deck';
+      }
+      const emptySlot = owner.monsters.findIndex(m => m === null);
+      if (source && idx >= 0 && emptySlot >= 0) {
+        const list = source === 'hand' ? owner.hand : owner.deck;
+        const [kid] = list.splice(idx, 1);
+        kid.faceUp = true;
+        kid.position = 'DEFENSE';
+        kid.hasAttacked = false;
+        kid.summonKind = 'SPECIAL';
+        owner.monsters[emptySlot] = kid;
+        log(`[Prank-Kids Dropsies] You gained 1000 LP and Special Summoned ${kid.name} from your ${source} in Defense Position.`);
+      } else {
+        log('[Prank-Kids Dropsies] You gained 1000 LP, but no legal Prank-Kids monster or open Monster Zone was available.');
+      }
       return true;
     }
   },
