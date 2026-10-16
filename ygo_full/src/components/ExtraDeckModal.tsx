@@ -134,7 +134,7 @@ export const ExtraDeckModal: React.FC<ExtraDeckModalProps> = ({
                     }`}
                   >
                     <div className="aspect-[3/4] rounded overflow-hidden bg-black/50 mb-1.5">
-                      <img src={card.art} alt={card.name} className="w-full h-full object-cover" />
+                      <img src={card.art} alt={card.name} className="w-full h-full object-contain" />
                     </div>
                     <div className="text-center">
                       <p className="font-['Cinzel'] font-bold text-[11px] text-stone-100 truncate">{card.name}</p>
@@ -179,7 +179,7 @@ export const ExtraDeckModal: React.FC<ExtraDeckModalProps> = ({
                         }`}
                       >
                         <div className="w-14 aspect-[3/4] rounded overflow-hidden mb-1">
-                          <img src={m.art} alt={m.name} className="w-full h-full object-cover" />
+                          <img src={m.art} alt={m.name} className="w-full h-full object-contain" />
                         </div>
                         <span className="font-bold text-[10px] text-stone-200 truncate w-full text-center">
                           {m.name}

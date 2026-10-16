@@ -68,7 +68,7 @@ export const BattlefieldOverlay: React.FC<BattlefieldOverlayProps> = ({
               <img
                 src={state.ai.fieldSpell.art}
                 alt={state.ai.fieldSpell.name}
-                className="w-full h-full object-cover rounded shadow"
+                className="w-full h-full object-contain rounded shadow"
               />
             ) : (
               <span className="text-[9px] font-['Orbitron'] text-emerald-400/70 font-bold text-center">
@@ -94,7 +94,7 @@ export const BattlefieldOverlay: React.FC<BattlefieldOverlayProps> = ({
               >
                 {card ? (
                   card.faceUp ? (
-                    <img src={card.art} alt={card.name} className="w-full h-full object-cover" />
+                    <img src={card.art} alt={card.name} className="w-full h-full object-contain" />
                   ) : (
                     <div className="w-full h-full bg-[#182a40] border border-[#d4af37]/60 flex items-center justify-center text-[10px] text-amber-300 font-['Cinzel'] font-bold">
                       SET
@@ -174,7 +174,7 @@ export const BattlefieldOverlay: React.FC<BattlefieldOverlayProps> = ({
                       <img
                         src={card.art}
                         alt={card.name}
-                        className={`w-full h-full object-cover rounded ${
+                        className={`w-full h-full object-contain rounded ${
                           card.position === 'DEFENSE' ? 'rotate-90 scale-90' : ''
                         }`}
                       />
@@ -224,7 +224,7 @@ export const BattlefieldOverlay: React.FC<BattlefieldOverlayProps> = ({
             <img
               src={state.extraMonsterZone[0].art}
               alt={state.extraMonsterZone[0].name}
-              className="w-full h-full object-cover rounded shadow"
+              className="w-full h-full object-contain rounded shadow"
               onClick={() => onInspectCard(state.extraMonsterZone[0]!)}
             />
           ) : (
@@ -254,7 +254,7 @@ export const BattlefieldOverlay: React.FC<BattlefieldOverlayProps> = ({
             <img
               src={state.extraMonsterZone[1].art}
               alt={state.extraMonsterZone[1].name}
-              className="w-full h-full object-cover rounded shadow"
+              className="w-full h-full object-contain rounded shadow"
               onClick={() => onInspectCard(state.extraMonsterZone[1]!)}
             />
           ) : (
@@ -287,7 +287,7 @@ export const BattlefieldOverlay: React.FC<BattlefieldOverlayProps> = ({
               <img
                 src={state.player.fieldSpell.art}
                 alt={state.player.fieldSpell.name}
-                className="w-full h-full object-cover rounded shadow"
+                className="w-full h-full object-contain rounded shadow"
               />
             ) : (
               <span className="text-[9px] font-['Orbitron'] text-emerald-400 font-bold text-center">
@@ -331,7 +331,7 @@ export const BattlefieldOverlay: React.FC<BattlefieldOverlayProps> = ({
                     <img
                       src={card.art}
                       alt={card.name}
-                      className={`w-full h-full object-cover rounded ${
+                      className={`w-full h-full object-contain rounded ${
                         card.position === 'DEFENSE' ? 'rotate-90 scale-90' : ''
                       }`}
                     />
@@ -383,7 +383,7 @@ export const BattlefieldOverlay: React.FC<BattlefieldOverlayProps> = ({
             >
               {card ? (
                 card.faceUp ? (
-                  <img src={card.art} alt={card.name} className="w-full h-full object-cover" />
+                  <img src={card.art} alt={card.name} className="w-full h-full object-contain" />
                 ) : (
                   <div className="w-full h-full bg-[#182a40] border border-[#d4af37]/70 flex items-center justify-center text-[10px] text-amber-300 font-['Cinzel'] font-bold">
                     SET

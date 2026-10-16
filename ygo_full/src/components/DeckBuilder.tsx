@@ -213,7 +213,7 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToMenu, onDeckUp
                 className="group relative cursor-pointer bg-[#0c1c2e] hover:bg-[#142e47] border border-[#254b69] hover:border-amber-400 rounded-xl p-2 flex flex-col justify-between transition-all hover:scale-105 shadow-md"
               >
                 <div className="aspect-[3/4] rounded-lg overflow-hidden bg-black/40 mb-1.5">
-                  <img src={def.art} alt={def.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                  <img src={def.art} alt={def.name} className="w-full h-full object-contain group-hover:scale-105 transition-transform" />
                 </div>
                 <div>
                   <h5 className="font-['Cinzel'] font-bold text-[11px] text-stone-100 truncate" title={def.name}>
@@ -268,7 +268,7 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToMenu, onDeckUp
                       className="flex items-center justify-between gap-2 p-1.5 bg-[#0e2136] border border-[#234b6e] rounded-lg"
                     >
                       <div className="flex items-center gap-1.5 truncate">
-                        <img src={def?.art} alt={name} className="w-6 h-8 object-cover rounded flex-shrink-0" />
+                        <img src={def?.art} alt={name} className="w-6 h-8 object-contain rounded flex-shrink-0" />
                         <span className="text-[10px] font-bold text-stone-200 truncate" title={name}>
                           {name}
                         </span>
@@ -313,7 +313,7 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToMenu, onDeckUp
                       className="flex items-center justify-between gap-2 p-1.5 bg-[#14122c] border border-purple-800/60 rounded-lg"
                     >
                       <div className="flex items-center gap-1.5 truncate">
-                        <img src={def?.art} alt={name} className="w-6 h-8 object-cover rounded flex-shrink-0" />
+                        <img src={def?.art} alt={name} className="w-6 h-8 object-contain rounded flex-shrink-0" />
                         <span className="text-[10px] font-bold text-purple-200 truncate" title={name}>
                           {name}
                         </span>

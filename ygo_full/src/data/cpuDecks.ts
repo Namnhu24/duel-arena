@@ -129,7 +129,7 @@ export const SURVIVAL_STAGES: SurvivalStage[] = [
     name: 'Academy Rookie',
     title: 'Duel Academy Novice',
     avatar: 'https://images.ygoprodeck.com/images/cards/74677422.jpg',
-    startingLp: 4000,
+    startingLp: 8000,
     dialog: 'I just finished training! Let me see how strong a real duelist is!',
     rewardLp: 2000,
     scoreBonus: 500,
@@ -146,7 +146,7 @@ export const SURVIVAL_STAGES: SurvivalStage[] = [
     name: 'Joey Wheeler',
     title: 'Miracle Gambler & Red-Eyes Warrior',
     avatar: 'https://images.ygoprodeck.com/images/cards/74677422.jpg',
-    startingLp: 6000,
+    startingLp: 8000,
     dialog: 'You wanna duel with Joey Wheeler?! Get ready for Brooklyn rage!',
     rewardLp: 2000,
     scoreBonus: 1000,
@@ -180,27 +180,5 @@ export const SURVIVAL_STAGES: SurvivalStage[] = [
     rewardLp: 2500,
     scoreBonus: 2000,
     deck: CPU_OPPONENTS[1].deck
-  },
-  {
-    stageNumber: 5,
-    name: 'Shadow Pharaoh',
-    title: 'Supreme Sovereign of the Shadow Realm',
-    avatar: 'https://images.ygoprodeck.com/images/cards/10000020.jpg',
-    startingLp: 10000,
-    dialog: 'Mortal, you have reached the summit of the Duel Tower. Face the ultimate darkness!',
-    rewardLp: 0,
-    scoreBonus: 5000,
-    deck: {
-      main: [
-        'Blue-Eyes White Dragon', 'Blue-Eyes White Dragon', 'Dark Magician', 'Dark Magician',
-        'Apprentice Illusion Magician', 'Cyber Dragon', 'Cyber Dragon',
-        'Ash Blossom & Joyous Spring', 'Effect Veiler', 'Honest',
-        'Raigeki', 'Dark Hole', 'Monster Reborn', 'Pot of Greed', 'Necrovalley',
-        'Solemn Judgment', 'Mirror Force', 'Magic Cylinder', 'Bottomless Trap Hole'
-      ],
-      extra: [
-        'Blue-Eyes Ultimate Dragon', 'Stardust Dragon', 'Number 39: Utopia', 'Decode Talker'
-      ]
-    }
   }
 ];

@@ -13,25 +13,25 @@ export const CARD_DATABASE: CardDefinition[] = [
   // FIELD SPELLS
   // ==========================================
   {
-    id: 56988951,
+    id: 62265044,
     name: 'Dragon Ravine',
     type: 'SPELL',
     subtype: 'Field Spell',
-    art: cardArt(56988951),
+    art: cardArt(62265044),
     hasFieldEffect: true,
-    text: 'Once per turn: You can discard 1 card; send 1 Dragon monster from your Deck to the GY, or add 1 Dragon monster from your Deck to your hand. All Dragon monsters on the field gain 300 ATK.',
+    text: 'Once per turn: You can discard 1 card, then activate 1 of these effects: add 1 Level 4 or lower "Dragunity" monster from your Deck to your hand; or send 1 Dragon monster from your Deck to the GY.',
     activateEffect: ({ log }) => {
       log('[Dragon Ravine] activated! Dragon spirits surge across the battlefield.');
     }
   },
   {
-    id: 4035199,
+    id: 59197169,
     name: 'Yami',
     type: 'SPELL',
     subtype: 'Field Spell',
-    art: cardArt(4035199),
+    art: cardArt(59197169),
     hasFieldEffect: true,
-    text: 'All Spellcaster and Fiend monsters on the field gain 300 ATK and DEF. All Fairy monsters lose 300 ATK and DEF. The battlefield is shrouded in ancient arcane darkness.',
+    text: 'All Fiend and Spellcaster monsters on the field gain 200 ATK/DEF, also all Fairy monsters on the field lose 200 ATK/DEF.',
     activateEffect: ({ log }) => {
       log('[Yami] activated! Darkness shrouds the duel stadium.');
     }
@@ -43,7 +43,7 @@ export const CARD_DATABASE: CardDefinition[] = [
     subtype: 'Field Spell',
     art: cardArt(50913601),
     hasFieldEffect: true,
-    text: 'All Dragon, Winged Beast, and Thunder monsters on the field gain 300 ATK and DEF. Lightning storms echo across the peaks.',
+    text: 'All Dragon, Winged Beast, and Thunder monsters on the field gain 200 ATK/DEF.',
     activateEffect: ({ log }) => {
       log('[Mountain] activated! Thunder and lightning strike the mountain peaks.');
     }
@@ -79,13 +79,13 @@ export const CARD_DATABASE: CardDefinition[] = [
     }
   },
   {
-    id: 97821005,
+    id: 76375976,
     name: 'Mystic Mine',
     type: 'SPELL',
     subtype: 'Field Spell',
-    art: cardArt(97821005),
+    art: cardArt(76375976),
     hasFieldEffect: true,
-    text: 'If your opponent controls more monsters than you do, your opponent cannot activate monster effects or declare an attack. Mists paralyze combat.',
+    text: 'If your opponent controls more monsters than you do, your opponent cannot activate monster effects or declare an attack. If you control more monsters than your opponent does, you cannot activate monster effects or declare an attack. Once per turn, during the End Phase, if both players control the same number of monsters: Destroy this card.',
     activateEffect: ({ log }) => {
       log('[Mystic Mine] activated! Heavy mist paralyzes monster actions.');
     }
@@ -883,7 +883,7 @@ export const CARD_DATABASE: CardDefinition[] = [
     text: 'A legendary fusion of three Blue-Eyes White Dragons. Its sheer 4500 ATK annihilates all opposition.'
   },
   {
-    id: 59287,
+    id: 18514525,
     name: 'Prank-Kids Rocket Ride',
     type: 'MONSTER',
     subtype: 'Fusion',
@@ -894,7 +894,7 @@ export const CARD_DATABASE: CardDefinition[] = [
     atk: 2000,
     def: 0,
     modelType: 'rock_prank',
-    art: cardArt(59287),
+    art: cardArt(18514525),
     materialText: '2 "Prank-Kids" monsters',
     text: 'This card can attack directly. You can Tribute this card, then target 2 "Prank-Kids" monsters with different names in your GY, except Fusion Monsters; Special Summon them.',
     activateEffect: ({ card, owner, log }) => {

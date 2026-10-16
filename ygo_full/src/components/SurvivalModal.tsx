@@ -31,10 +31,10 @@ export const SurvivalModal: React.FC<SurvivalModalProps> = ({
             </div>
             <div>
               <h2 className="font-['Cinzel'] font-black text-2xl text-white tracking-wide">
-                MODE 4: SURVIVAL GAUNTLET <span className="text-orange-400">(DUEL TOWER)</span>
+                SURVIVAL GAUNTLET <span className="text-orange-400">(DUEL TOWER)</span>
               </h2>
               <p className="text-xs text-stone-400 font-medium">
-                Test your endurance against 5 consecutive opponents with carrying-over Life Points!
+                Defeat all 4 opponents in a row. Start with 8000 LP; your exact remaining LP carries into the next duel without recovery.
               </p>
             </div>
           </div>
@@ -52,7 +52,7 @@ export const SurvivalModal: React.FC<SurvivalModalProps> = ({
             <Heart className="w-7 h-7 text-rose-400 flex-shrink-0 animate-pulse" />
             <div>
               <span className="block font-['Orbitron'] font-black text-xs text-stone-200">LP CARRIES OVER</span>
-              <span className="text-[10px] text-stone-400 leading-tight block">Your LP stays from stage to stage</span>
+              <span className="text-[10px] text-stone-400 leading-tight block">Your LP carries over unchanged</span>
             </div>
           </div>
 
@@ -60,15 +60,15 @@ export const SurvivalModal: React.FC<SurvivalModalProps> = ({
             <Award className="w-7 h-7 text-emerald-400 flex-shrink-0" />
             <div>
               <span className="block font-['Orbitron'] font-black text-xs text-stone-200">STAGE RECOVERY</span>
-              <span className="text-[10px] text-stone-400 leading-tight block">+2,000 LP heal per stage victory</span>
+              <span className="text-[10px] text-stone-400 leading-tight block">No LP recovery between opponents</span>
             </div>
           </div>
 
           <div className="p-3 rounded-2xl bg-[#0a1b2d] border border-amber-500/30 flex items-center gap-3">
             <Trophy className="w-7 h-7 text-amber-400 flex-shrink-0" />
             <div>
-              <span className="block font-['Orbitron'] font-black text-xs text-stone-200">5-BOSS SUMMIT</span>
-              <span className="text-[10px] text-stone-400 leading-tight block">Defeat Shadow Pharaoh for the title</span>
+              <span className="block font-['Orbitron'] font-black text-xs text-stone-200">4-OPPONENT GAUNTLET</span>
+              <span className="text-[10px] text-stone-400 leading-tight block">Win all 4 consecutive duels</span>
             </div>
           </div>
         </div>
@@ -79,14 +79,14 @@ export const SurvivalModal: React.FC<SurvivalModalProps> = ({
             <div
               key={stg.stageNumber}
               className={`flex items-center justify-between p-3.5 rounded-2xl border transition-all ${
-                stg.stageNumber === 5
+                stg.stageNumber === 4
                   ? 'border-rose-500/60 bg-gradient-to-r from-rose-950/40 via-[#190d1e] to-[#0c1824]'
                   : 'border-[#1b354d] bg-[#091826]/70'
               }`}
             >
               <div className="flex items-center gap-3.5">
                 <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-['Orbitron'] font-black text-xs border ${
-                  stg.stageNumber === 5
+                  stg.stageNumber === 4
                     ? 'bg-rose-500 text-stone-950 border-rose-400 shadow-[0_0_12px_rgba(244,63,94,0.6)]'
                     : 'bg-[#12283d] text-amber-300 border-[#2b516b]'
                 }`}>
@@ -100,7 +100,7 @@ export const SurvivalModal: React.FC<SurvivalModalProps> = ({
                     <span className="font-['Cinzel'] font-black text-sm text-stone-100">
                       {stg.name}
                     </span>
-                    {stg.stageNumber === 5 && (
+                    {stg.stageNumber === 4 && (
                       <span className="px-2 py-0.5 rounded-full bg-rose-900/80 border border-rose-500 text-[9px] font-bold text-rose-300 font-['Orbitron']">
                         FINAL BOSS
                       </span>
@@ -116,8 +116,8 @@ export const SurvivalModal: React.FC<SurvivalModalProps> = ({
                 <span className="block font-['Orbitron'] font-black text-xs text-amber-300">
                   {stg.startingLp} LP
                 </span>
-                <span className="text-[10px] text-emerald-400 font-semibold font-['Orbitron']">
-                  +{stg.rewardLp} LP reward
+                <span className="text-[10px] text-stone-500 font-semibold font-['Orbitron']">
+                  OPPONENT LP
                 </span>
               </div>
             </div>

@@ -138,7 +138,7 @@ export const CardWikiModal: React.FC<CardWikiModalProps> = ({ isOpen, onClose })
                   }`}
                 >
                   <div className="aspect-[3/4] rounded-lg overflow-hidden bg-black/40 mb-1.5">
-                    <img src={card.art} alt={card.name} className="w-full h-full object-cover" />
+                    <img src={card.art} alt={card.name} className="w-full h-full object-contain" />
                   </div>
                   <div>
                     <h5 className="font-['Cinzel'] font-bold text-[11px] text-stone-100 truncate" title={card.name}>

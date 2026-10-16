@@ -95,7 +95,7 @@ export const TributeModal: React.FC<TributeModalProps> = ({
                       <img
                         src={m.art}
                         alt={m.name}
-                        className={`w-full h-full object-cover ${!m.faceUp ? 'brightness-50' : ''}`}
+                        className={`w-full h-full object-contain ${!m.faceUp ? 'brightness-50' : ''}`}
                       />
                       {isSelected && (
                         <div className="absolute inset-0 bg-rose-900/60 flex items-center justify-center">

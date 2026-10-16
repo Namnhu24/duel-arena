@@ -25,9 +25,10 @@ export const MainMenu: React.FC<MainMenuProps> = ({
   onOpenLeaderboard, onOpenDeployGuide, canContinue,
 }) => {
   const [exitMsg, setExitMsg] = useState(false);
+  const [playModeOpen, setPlayModeOpen] = useState(false);
   const go = (callback: () => void) => { sound.playSpecialSummon(); callback(); };
   const menuItems = [
-    { title: 'PLAY', subtitle: 'Đấu với AI / Đấu trực tuyến', icon: Swords, action: () => go(onOpenSoloMode), primary: true },
+    { title: 'PLAY', subtitle: 'VS CPU · ONLINE · SURVIVAL', icon: Swords, action: () => { sound.playPhase(); setPlayModeOpen(true); }, primary: true },
     { title: 'DECK BUILD', subtitle: 'Xây dựng bộ bài của bạn', icon: Layers, action: () => go(onOpenDeckEditor) },
     { title: 'SETTINGS', subtitle: 'Tùy chỉnh trò chơi', icon: Settings, action: () => go(onOpenDeployGuide) },
     { title: 'EXIT', subtitle: 'Thoát game', icon: Power, action: () => { sound.playPhase(); setExitMsg(true); } },
@@ -40,7 +41,7 @@ export const MainMenu: React.FC<MainMenuProps> = ({
         <div className="ygo-topline" />
         <nav aria-label="Main navigation">
           <button className="ygo-nav active" onClick={() => window.scrollTo({top: 0, behavior: 'smooth'})}><Home /> <span>Home</span></button>
-          <button className="ygo-nav" onClick={() => go(onOpenSoloMode)}><Swords /> <span>Play</span></button>
+          <button className="ygo-nav" onClick={() => { sound.playPhase(); setPlayModeOpen(true); }}><Swords /> <span>Play</span></button>
           <button className="ygo-nav" onClick={() => go(onOpenDeckEditor)}><Layers /> <span>Deck</span></button>
           <button className="ygo-nav" onClick={() => go(onOpenDeployGuide)}><Settings /> <span>Settings</span></button>
         </nav>
@@ -78,6 +79,19 @@ export const MainMenu: React.FC<MainMenuProps> = ({
       </section>
 
       <footer className="ygo-home-footer"><span>IT’S NOT JUST A GAME</span><span>IT’S A DUEL OF SOULS</span></footer>
+      {playModeOpen && <div className="ygo-exit-backdrop" role="dialog" aria-modal="true" aria-label="Choose game mode">
+        <div className="ygo-mode-card">
+          <button className="ygo-exit-close" onClick={() => setPlayModeOpen(false)} aria-label="Close"><X /></button>
+          <div className="ygo-mode-kicker">IT’S TIME TO DUEL</div>
+          <h2>CHOOSE YOUR MODE</h2>
+          <p>Chọn cách bạn muốn bước vào đấu trường.</p>
+          <div className="ygo-mode-options">
+            <button onClick={() => { setPlayModeOpen(false); go(onOpenSoloMode); }}><Swords /><span><strong>VS CPU</strong><small>Đấu với các đối thủ do máy điều khiển</small></span><ArrowRight /></button>
+            <button onClick={() => { setPlayModeOpen(false); go(onOpenOnlinePvp); }}><Globe /><span><strong>ONLINE</strong><small>Tạo phòng hoặc tham gia phòng đấu trực tuyến</small></span><ArrowRight /></button>
+            <button onClick={() => { setPlayModeOpen(false); go(onOpenSurvival); }}><Flame /><span><strong>SURVIVAL</strong><small>8000 LP · Đánh bại 4 đối thủ liên tiếp · Giữ nguyên LP</small></span><ArrowRight /></button>
+          </div>
+        </div>
+      </div>}
       {exitMsg && <div className="ygo-exit-backdrop" role="dialog" aria-modal="true">
         <div className="ygo-exit-card"><button className="ygo-exit-close" onClick={() => setExitMsg(false)} aria-label="Close"><X /></button><Sparkles /><h2>DUELIST, DON’T LEAVE YET!</h2><p>Đây là trò chơi web. Bạn có thể đóng tab hoặc quay lại bất cứ lúc nào.</p><button onClick={() => setExitMsg(false)}>BACK TO ARENA</button></div>
       </div>}

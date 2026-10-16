@@ -83,7 +83,7 @@ export const GraveyardModal: React.FC<GraveyardModalProps> = ({
                     <img
                       src={card.art}
                       alt={card.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                      className="w-full h-full object-contain group-hover:scale-105 transition-transform"
                     />
                     {hasGySkill && (
                       <div className="absolute top-1 right-1 bg-purple-600/90 text-purple-100 text-[10px] font-['Orbitron'] font-black px-1.5 py-0.5 rounded shadow">

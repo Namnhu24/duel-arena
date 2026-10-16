@@ -113,7 +113,7 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
                   <img
                     src={card.art}
                     alt={card.name}
-                    className="w-full h-full object-cover select-none pointer-events-none"
+                    className="w-full h-full object-contain select-none pointer-events-none"
                     draggable={false}
                   />
                 </div>

@@ -34,7 +34,7 @@ export const DuelResultModal: React.FC<DuelResultModalProps> = ({
   const isVictory = result === 'victory';
   const isSurvival = gameMode === 'SURVIVAL';
   const isLocal2P = gameMode === 'LOCAL_2P';
-  const isTowerCleared = isSurvival && isVictory && survivalStage >= 5;
+  const isTowerCleared = isSurvival && isVictory && survivalStage >= 4;
 
   React.useEffect(() => {
     if (isVictory) {
@@ -67,7 +67,7 @@ export const DuelResultModal: React.FC<DuelResultModalProps> = ({
         </div>
 
         <span className="font-['Orbitron'] text-xs font-black tracking-widest text-amber-300/80 mb-1 uppercase">
-          {isSurvival ? `SURVIVAL GAUNTLET · STAGE ${survivalStage} OF 5` : isLocal2P ? 'LOCAL 2-PLAYER MATCH' : 'DUEL ARENA RESULTS'}
+          {isSurvival ? `SURVIVAL GAUNTLET · STAGE ${survivalStage} OF 4` : isLocal2P ? 'LOCAL 2-PLAYER MATCH' : 'DUEL ARENA RESULTS'}
         </span>
 
         <h1 className={`font-['Cinzel'] font-black text-3xl sm:text-4xl tracking-widest mb-2 ${
@@ -90,7 +90,7 @@ export const DuelResultModal: React.FC<DuelResultModalProps> = ({
                 <div className="space-y-1">
                   <p className="text-amber-300 font-bold">You defeated the Shadow Pharaoh!</p>
                   <p>Title unlocked: <span className="font-['Orbitron'] text-yellow-300 font-black">KING OF GAMES (VUA TRÒ CHƠI)</span></p>
-                  <p className="text-stone-400">Total Score: <span className="text-white font-bold">{survivalScore + 5000}</span></p>
+                  <p className="text-stone-400">Total Score: <span className="text-white font-bold">{survivalScore + 4000}</span></p>
                 </div>
               ) : (
                 <div className="space-y-1">

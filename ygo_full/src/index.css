@@ -69,3 +69,18 @@ body { background: #020816; }
  .ygo-home-footer { bottom:16px; left:20px; }
 }
 @media (max-width:390px) { .ygo-nav span { display:none; } .ygo-topbar nav { gap:20px; } .ygo-quick-links { gap:5px; } }
+
+/* Play mode selector */
+.ygo-mode-card { position:relative; width:min(560px,100%); padding:clamp(24px,5vw,38px); background:linear-gradient(145deg,rgba(7,24,49,.98),rgba(5,11,28,.98)); border:1px solid rgba(87,184,255,.72); box-shadow:0 0 60px rgba(0,112,255,.2),inset 0 0 35px rgba(22,95,164,.12); color:#f4f8ff; }
+.ygo-mode-kicker { color:#6fcaff; font:700 10px Orbitron, sans-serif; letter-spacing:.32em; }
+.ygo-mode-card h2 { margin:9px 0 5px; font:900 clamp(22px,4vw,30px) Cinzel,Georgia,serif; letter-spacing:.04em; }
+.ygo-mode-card>p { margin:0 0 22px; color:#a8bddb; font-size:13px; }
+.ygo-mode-options { display:flex; flex-direction:column; gap:10px; }
+.ygo-mode-options button { display:flex; align-items:center; gap:14px; width:100%; padding:15px; text-align:left; color:#eaf5ff; background:linear-gradient(100deg,rgba(20,56,91,.88),rgba(7,20,42,.88)); border:1px solid rgba(85,153,213,.35); cursor:pointer; transition:transform .18s,border-color .18s,background .18s; }
+.ygo-mode-options button:hover { transform:translateX(3px); border-color:#6bd1ff; background:linear-gradient(100deg,rgba(20,87,137,.95),rgba(9,31,62,.95)); }
+.ygo-mode-options button>svg:first-child { width:26px; height:26px; flex-shrink:0; color:#77d7ff; }
+.ygo-mode-options button>svg:last-child { width:17px; height:17px; margin-left:auto; color:#8db6e2; }
+.ygo-mode-options button span { display:flex; flex-direction:column; gap:4px; }
+.ygo-mode-options button strong { font:800 14px Orbitron, sans-serif; letter-spacing:.08em; }
+.ygo-mode-options button small { color:#adc2df; font-size:11px; line-height:1.4; }
+@media (max-width:500px) { .ygo-mode-options button { padding:12px; gap:10px; } .ygo-mode-options button small { font-size:10px; } }

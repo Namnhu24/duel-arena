@@ -510,7 +510,7 @@ export default function App() {
       player,
       ai: cpu,
       extraMonsterZone: [null, null],
-      logs: [`[SURVIVAL TOWER STAGE 1] Challenging ${stage.name} (${stage.startingLp} LP)! "${stage.dialog}"`],
+      logs: [`[SURVIVAL TOWER STAGE 1 OF 4] Challenging ${stage.name} (${stage.startingLp} LP)! "${stage.dialog}"`],
       lastAttackAnimation: null,
     });
 
@@ -525,10 +525,10 @@ export default function App() {
 
     sound.playSpecialSummon();
     // Carry over remaining LP + reward recovery!
-    const healedLp = Math.min(8000, state.player.lp + 2000);
+    const carriedLp = state.player.lp;
 
     const nextPlayer = createPlayerFromDeck(userProfile.name, deckConfig);
-    nextPlayer.lp = healedLp;
+    nextPlayer.lp = carriedLp;
     const nextCpu = createPlayerFromDeck(stage.name, stage.deck);
     nextCpu.lp = stage.startingLp;
 
@@ -559,7 +559,7 @@ export default function App() {
       ai: nextCpu,
       extraMonsterZone: [null, null],
       logs: [
-        `[STAGE ${nextStageNum} OF 5] +2000 LP stage recovery applied! Opponent: ${stage.name} (${stage.startingLp} LP). "${stage.dialog}"`
+        `[STAGE ${nextStageNum} OF 4] LP carried over unchanged: ${carriedLp}. Opponent: ${stage.name} (${stage.startingLp} LP). "${stage.dialog}"`
       ],
       lastAttackAnimation: null,
     });
