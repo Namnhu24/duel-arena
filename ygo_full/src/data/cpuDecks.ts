@@ -109,6 +109,43 @@ export const CPU_OPPONENTS: CpuOpponent[] = [
       ]
     }
   }
+
+  {
+    id: 'kaiser-ryo',
+    name: 'Kaiser Ryo',
+    title: 'Cyber Dragon Kaiser',
+    avatar: 'https://images.ygoprodeck.com/images/cards/70095154.jpg',
+    signatureCard: 'Cyber End Dragon',
+    difficulty: 'Expert',
+    dialog: 'Behold the ultimate power of Cyber Style! I will overwhelm you with mechanical fusion!',
+    deck: {
+      main: [
+        'Cyber Dragon', 'Cyber Dragon', 'Cyber Dragon',
+        'Cyber Dragon Core', 'Cyber Dragon Core', 'Cyber Dragon Core',
+        'Cyber Dragon Herz', 'Cyber Dragon Herz',
+        'Cyber Dragon Nachster', 'Cyber Dragon Nachster',
+        'Cyber Emergency', 'Cyber Emergency', 'Cyber Emergency',
+        'Cyber Repair Plant', 'Cyber Repair Plant',
+        'Machine Duplication', 'Machine Duplication', 'Machine Duplication',
+        'Power Bond', 'Power Bond', 'Power Bond',
+        'Cyber Revsystem', 'Cyber Revsystem',
+        'Overload Fusion', 'Overload Fusion',
+        'Polymerization', 'Polymerization',
+        'Limiter Removal', 'Monster Reborn', 'Raigeki',
+        'Cybernetic Overflow', 'Cybernetic Overflow',
+        'Mirror Force', 'Torrential Tribute', 'Solemn Judgment',
+        'Mystical Space Typhoon', 'Mystical Space Typhoon', 'Pot of Greed', 'Bottomless Trap Hole', 'Magic Cylinder'
+      ],
+      extra: [
+        'Chimeratech Rampage Dragon', 'Chimeratech Rampage Dragon',
+        'Cyber Dragon Infinity', 'Cyber Dragon Nova', 'Cyber Dragon Nova',
+        'Chimeratech Fortress Dragon', 'Chimeratech Megafleet Dragon',
+        'Cyber Dragon Sieger', 'Cyber End Dragon', 'Cyber Twin Dragon',
+        'Blue-Eyes Ultimate Dragon', 'Number 39: Utopia', 'Decode Talker'
+      ]
+    }
+  },
+
 ];
 
 export interface SurvivalStage {

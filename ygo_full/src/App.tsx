@@ -153,6 +153,7 @@ export default function App() {
   const [isExtraOpen, setIsExtraOpen] = useState(false);
   const [actionCard, setActionCard] = useState<CardInstance | null>(null);
   const [actionList, setActionList] = useState<CardActionItem[]>([]);
+  const [pendingSummonChoice, setPendingSummonChoice] = useState<CardInstance | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [pendingSelection, setPendingSelection] = useState<{ title: string; description: string; candidates: { card: CardInstance; source: 'hand' | 'deck' | 'playerGY' | 'aiGY' | 'field' }[]; effect: 'DROPSIES' | 'REBORN' | 'HONEST_NEOS' } | null>(null);
 
@@ -664,6 +665,73 @@ export default function App() {
           m.hasChangedPosition = false;
         }
       });
+
+      // Kaiser Ryo's Cyber Dragon AI: search, deploy Cyber bodies, then Fusion OTK lines.
+      const isKaiserRyo = /kaiser ryo/i.test(ai.name);
+      if (isKaiserRyo) {
+        // Cyber Emergency searches a missing starter when available.
+        const emergencyIndex = ai.hand.findIndex(c => c.name === 'Cyber Emergency');
+        if (emergencyIndex >= 0) {
+          const hasStarter = ai.hand.some(c => ['Cyber Dragon Core', 'Cyber Dragon', 'Cyber Dragon Herz'].includes(c.name));
+          if (!hasStarter) {
+            const searchIndex = ai.deck.findIndex(c => c.name === 'Cyber Dragon Core' || c.name === 'Cyber Dragon');
+            if (searchIndex >= 0) ai.hand.push(ai.deck.splice(searchIndex, 1)[0]);
+          }
+          ai.graveyard.push(ai.hand.splice(emergencyIndex, 1)[0]);
+        }
+
+        // If the opponent controls a monster and Kaiser controls none, deploy Cyber Dragon from hand.
+        if (ai.monsters.every(m => !m) && player.monsters.some(Boolean)) {
+          const cdIndex = ai.hand.findIndex(c => c.name === 'Cyber Dragon');
+          const empty = ai.monsters.findIndex(m => !m);
+          if (cdIndex >= 0 && empty >= 0) {
+            const [cd] = ai.hand.splice(cdIndex, 1);
+            cd.faceUp = true; cd.position = 'ATTACK'; cd.placedTurn = newTurn;
+            cd.hasAttacked = false; cd.summonKind = 'SPECIAL'; ai.monsters[empty] = cd;
+          }
+        }
+
+        // Prefer Core as the normal summon starter when no monster has been deployed.
+        if (ai.monsters.every(m => !m)) {
+          const coreIndex = ai.hand.findIndex(c => c.name === 'Cyber Dragon Core');
+          const empty = ai.monsters.findIndex(m => !m);
+          if (coreIndex >= 0 && empty >= 0) {
+            const [core] = ai.hand.splice(coreIndex, 1);
+            core.faceUp = true; core.position = 'ATTACK'; core.placedTurn = newTurn;
+            core.hasAttacked = false; core.summonKind = 'NORMAL'; ai.monsters[empty] = core;
+            // Core's on-summon search: find Cyber Emergency or Cyber Repair Plant.
+            const searchIndex = ai.deck.findIndex(c => c.name === 'Cyber Emergency' || c.name === 'Cyber Repair Plant');
+            if (searchIndex >= 0) ai.hand.push(ai.deck.splice(searchIndex, 1)[0]);
+          }
+        }
+
+        // Power Bond into Chimeratech Rampage Dragon when two Cyber Dragon bodies are available.
+        const powerBondIndex = ai.hand.findIndex(c => c.name === 'Power Bond');
+        const rampageIndex = ai.extraDeck.findIndex(c => c.name === 'Chimeratech Rampage Dragon');
+        const cyberField = ai.monsters.map((m, slot) => ({ m, slot })).filter(x => x.m && /Cyber Dragon/.test(x.m.name));
+        const cyberHand = ai.hand.map((c, index) => ({ c, index })).filter(x => /Cyber Dragon/.test(x.c.name) && x.c.type === 'MONSTER');
+        if (powerBondIndex >= 0 && rampageIndex >= 0 && cyberField.length + cyberHand.length >= 2) {
+          let materials = 0;
+          for (const item of cyberField) {
+            if (materials >= 2) break;
+            if (item.m) { ai.graveyard.push(item.m); ai.monsters[item.slot] = null; materials++; }
+          }
+          for (const item of cyberHand) {
+            if (materials >= 2) break;
+            const idx = ai.hand.findIndex(c => c.uid === item.c.uid);
+            if (idx >= 0) { ai.graveyard.push(ai.hand.splice(idx, 1)[0]); materials++; }
+          }
+          if (materials >= 2) {
+            ai.graveyard.push(ai.hand.splice(ai.hand.findIndex(c => c.name === 'Power Bond'), 1)[0]);
+            const fusion = ai.extraDeck.splice(rampageIndex, 1)[0];
+            fusion.faceUp = true; fusion.position = 'ATTACK'; fusion.placedTurn = newTurn;
+            fusion.hasAttacked = false; fusion.summonKind = 'FUSION';
+            fusion.attackBonus = fusion.atk || 0; // Power Bond doubles original ATK.
+            const empty = ai.monsters.findIndex(m => !m);
+            if (empty >= 0) ai.monsters[empty] = fusion;
+          }
+        }
+      }
 
       // Field spell
       const fieldIndex = ai.hand.findIndex(c => c.subtype === 'Field Spell');
@@ -1410,12 +1478,12 @@ export default function App() {
           label: tributes > 0 ? `Tribute Summon (${tributes} Tribute${tributes > 1 ? 's' : ''})` : 'Normal Summon',
           desc: `Level ${card.level} · ATK ${card.atk} / DEF ${card.def}`,
           tone: 'primary',
-          run: () => requestNormalSummon(card, 'SUMMON'),
+          run: () => setPendingSummonChoice(card),
         });
         actions.push({
           label: tributes > 0 ? `Tribute Set (${tributes} Tribute${tributes > 1 ? 's' : ''})` : 'Set Monster',
           desc: 'Place face-down in Defense Position',
-          run: () => requestNormalSummon(card, 'SET'),
+          run: () => setPendingSummonChoice(card),
         });
       }
 
@@ -1751,6 +1819,28 @@ export default function App() {
         onSummonExtraMonster={handleSummonExtraMonster}
         onSelectInspect={(c) => setState(prev => ({ ...prev, selectedCardUid: c.uid }))}
       />
+
+      {pendingSummonChoice && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-sky-500/60 bg-[#091524] p-5 shadow-2xl">
+            <div className="flex items-start gap-4">
+              <img src={pendingSummonChoice.art} alt={pendingSummonChoice.name} className="w-28 rounded-lg border border-sky-400/40 object-contain" />
+              <div className="min-w-0 flex-1">
+                <h2 className="font-['Cinzel'] text-lg font-bold text-amber-200">{pendingSummonChoice.name}</h2>
+                <p className="mt-1 text-xs text-sky-200">{pendingSummonChoice.subtype || pendingSummonChoice.type} · Level {pendingSummonChoice.level ?? '—'}</p>
+                <p className="mt-2 text-xs leading-relaxed text-stone-300">{pendingSummonChoice.text || 'No effect text.'}</p>
+                {pendingSummonChoice.type === 'MONSTER' && <p className="mt-2 text-xs font-bold text-white">ATK {pendingSummonChoice.atk ?? 0} / DEF {pendingSummonChoice.def ?? 0}</p>}
+              </div>
+            </div>
+            <p className="mt-4 text-sm text-stone-200">Choose how to place this monster:</p>
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <button onClick={() => { const c = pendingSummonChoice; setPendingSummonChoice(null); requestNormalSummon(c, 'SUMMON'); }} className="rounded-xl border border-amber-400 bg-amber-500 px-3 py-3 text-sm font-bold text-black hover:bg-amber-400">✓ Face-up Attack</button>
+              <button onClick={() => { const c = pendingSummonChoice; setPendingSummonChoice(null); requestNormalSummon(c, 'SET'); }} className="rounded-xl border border-sky-500 bg-sky-950 px-3 py-3 text-sm font-bold text-sky-100 hover:bg-sky-900">▣ Face-down Defense</button>
+            </div>
+            <button onClick={() => setPendingSummonChoice(null)} className="mt-3 w-full rounded-lg border border-rose-500/60 py-2 text-sm text-rose-200 hover:bg-rose-950/60">✕ Cancel</button>
+          </div>
+        </div>
+      )}
 
       <CardActionDialog
         card={actionCard}

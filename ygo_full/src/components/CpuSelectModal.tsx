@@ -52,7 +52,7 @@ export const CpuSelectModal: React.FC<CpuSelectModalProps> = ({
         </div>
 
         {/* 4 Iconic CPU Rivals Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 my-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 my-6">
           {CPU_OPPONENTS.map((opp) => {
             const isSelected = opp.id === selectedId;
             return (
