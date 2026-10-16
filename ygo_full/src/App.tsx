@@ -154,6 +154,7 @@ export default function App() {
   const [actionCard, setActionCard] = useState<CardInstance | null>(null);
   const [actionList, setActionList] = useState<CardActionItem[]>([]);
   const [isMuted, setIsMuted] = useState(false);
+  const [pendingSelection, setPendingSelection] = useState<{ title: string; description: string; candidates: { card: CardInstance; source: 'hand' | 'deck' | 'playerGY' | 'aiGY' | 'field' }[]; effect: 'DROPSIES' | 'REBORN' | 'HONEST_NEOS' } | null>(null);
 
   // Tribute Selection Modal State
   const [tributeState, setTributeState] = useState<{
@@ -268,39 +269,29 @@ export default function App() {
     return all.find(c => c && c.uid === state.selectedCardUid) || null;
   }, [state]);
 
-  // Field Spell continuous bonuses
+  // Continuous Field Spell bonuses. Recalculate both ATK and DEF from printed values
+  // so removing/changing a Field Spell never leaves stale bonuses behind.
   useEffect(() => {
     const activeSpell = state.player.fieldSpell || state.ai.fieldSpell;
     setState(prev => {
-      const applyField = (p: PlayerState) => {
-        p.monsters.forEach(m => {
-          if (!m) return;
+      const applyField = (p: PlayerState): PlayerState => ({
+        ...p,
+        monsters: p.monsters.map(m => {
+          if (!m) return null;
           let bonus = 0;
-          if (activeSpell?.name === 'Mountain') {
-            if (['Dragon', 'Winged Beast', 'Thunder'].includes(m.race || '')) bonus += 300;
-          } else if (activeSpell?.name === 'Yami') {
-            if (['Spellcaster', 'Fiend'].includes(m.race || '')) bonus += 300;
-            if (m.race === 'Fairy') bonus -= 300;
-          } else if (activeSpell?.name === 'Dragon Ravine') {
-            if (m.race === 'Dragon') bonus += 300;
-          } else if (activeSpell?.name === 'Necrovalley') {
-            if (m.name.includes('Gravekeeper')) bonus += 500;
-          } else if (activeSpell?.name === 'Prank-Kids Place') {
-            if (m.name.startsWith('Prank-Kids')) bonus += 500;
-          }
-          m.attackBonus = bonus;
-        });
-      };
-      const newPlayer = { ...prev.player };
-      const newAi = { ...prev.ai };
-      applyField(newPlayer);
-      applyField(newAi);
-      return {
-        ...prev,
-        activeFieldSpellEffect: activeSpell?.name || null,
-        player: newPlayer,
-        ai: newAi,
-      };
+          // These classic Field Spells grant the same bonus to ATK and DEF.
+          if (activeSpell?.name === 'Mountain' && ['Dragon', 'Winged Beast', 'Thunder'].includes(m.race || '')) bonus = 200;
+          else if (activeSpell?.name === 'Yami') {
+            if (['Spellcaster', 'Fiend'].includes(m.race || '')) bonus = 200;
+            else if (m.race === 'Fairy') bonus = -200;
+          } else if (activeSpell?.name === 'Necrovalley' && m.name.includes('Gravekeeper')) bonus = 500;
+          // Dragon Ravine and Prank-Kids Place do not grant a blanket ATK/DEF bonus.
+          return { ...m, attackBonus: bonus, defenseBonus: bonus };
+        }),
+      });
+      const newPlayer = applyField(prev.player);
+      const newAi = applyField(prev.ai);
+      return { ...prev, activeFieldSpellEffect: activeSpell?.name || null, player: newPlayer, ai: newAi };
     });
   }, [state.player.fieldSpell, state.ai.fieldSpell]);
 
@@ -676,8 +667,10 @@ export default function App() {
 
       // Field spell
       const fieldIndex = ai.hand.findIndex(c => c.subtype === 'Field Spell');
-      if (fieldIndex >= 0 && !ai.fieldSpell) {
+      if (fieldIndex >= 0) {
         const [fieldCard] = ai.hand.splice(fieldIndex, 1);
+        // Activating a new Field Spell replaces the previous one; the old card goes to the GY.
+        if (ai.fieldSpell) ai.graveyard.push(ai.fieldSpell);
         fieldCard.faceUp = true;
         ai.fieldSpell = fieldCard;
         sound.playFieldSpell();
@@ -694,13 +687,15 @@ export default function App() {
         const best = monsterCandidates[0];
         
         if (best.tributes > 0) {
-          let tributed = 0;
-          for (let i = 0; i < ai.monsters.length; i++) {
-            if (ai.monsters[i] && tributed < best.tributes) {
-              ai.graveyard.push(ai.monsters[i]!);
-              ai.monsters[i] = null;
-              tributed++;
-            }
+          // Harder CPU: pay tribute with the weakest monsters first, preserving stronger board presence.
+          const tributeSlots = ai.monsters
+            .map((monster, slot) => ({ monster, slot }))
+            .filter((entry): entry is { monster: CardInstance; slot: number } => entry.monster !== null)
+            .sort((a, b) => ((a.monster.atk || 0) + (a.monster.attackBonus || 0)) - ((b.monster.atk || 0) + (b.monster.attackBonus || 0)))
+            .slice(0, best.tributes);
+          for (const { monster, slot } of tributeSlots) {
+            ai.graveyard.push(monster);
+            ai.monsters[slot] = null;
           }
         }
 
@@ -726,17 +721,37 @@ export default function App() {
         ai.spells[emptySpell] = trapCard;
       }
 
-      // Attack
+      // Attack. Having no monster to attack with never causes an LP penalty by itself.
       let attackAnim = null;
-      const aiAttackers = ai.monsters.filter(m => m && m.faceUp && m.position === 'ATTACK');
+      const aiAttackers = ai.monsters.filter(m => m && m.faceUp && m.position === 'ATTACK' && !m.hasAttacked);
       aiAttackers.forEach(attacker => {
         if (!attacker || attacker.hasAttacked) return;
         const playerMonsters = player.monsters.filter(Boolean);
 
         if (playerMonsters.length > 0) {
-          const target = playerMonsters[0]!;
+          // Choose the weakest legal target the CPU can destroy; otherwise pressure the weakest monster.
+          const attackerAtk = (attacker.atk || 0) + (attacker.attackBonus || 0);
+          // Never throw a weaker CPU monster into a stronger Attack Position monster.
+          // Such a bad attack was the main reason CPU LP appeared to drop at turn end
+          // when the CPU had not successfully summoned a stronger monster.
+          const safeTargets = playerMonsters.filter(target => {
+            if (target.position === 'DEFENSE') return true;
+            return attackerAtk >= ((target.atk || 0) + (target.attackBonus || 0));
+          });
+          if (safeTargets.length === 0) {
+            // No safe battle target: hold the attack instead of losing LP needlessly.
+            return;
+          }
+          const target = [...safeTargets].sort((a, b) => {
+            const aValue = a.position === 'DEFENSE' ? (a.def || 0) + (a.defenseBonus || 0) : (a.atk || 0) + (a.attackBonus || 0);
+            const bValue = b.position === 'DEFENSE' ? (b.def || 0) + (b.defenseBonus || 0) : (b.atk || 0) + (b.attackBonus || 0);
+            const aDestroyable = attackerAtk > aValue;
+            const bDestroyable = attackerAtk > bValue;
+            return Number(bDestroyable) - Number(aDestroyable) || aValue - bValue;
+          })[0];
           attacker.hasAttacked = true;
-          const diff = (attacker.atk || 0) - (target.atk || 0);
+          const targetValue = target.position === 'DEFENSE' ? (target.def || 0) + (target.defenseBonus || 0) : (target.atk || 0) + (target.attackBonus || 0);
+          const diff = attackerAtk - targetValue;
 
           sound.playAttack();
           attackAnim = {
@@ -746,7 +761,15 @@ export default function App() {
             timestamp: Date.now()
           };
 
-          if (diff > 0) {
+          if (target.position === 'DEFENSE') {
+            // DEF battles do not inflict battle damage unless the attacker has a piercing effect.
+            if (diff > 0) {
+              const pIdx = player.monsters.indexOf(target);
+              if (pIdx >= 0) player.monsters[pIdx] = null;
+              player.graveyard.push(target);
+              sound.playDestroy();
+            }
+          } else if (diff > 0) {
             const pIdx = player.monsters.indexOf(target);
             if (pIdx >= 0) player.monsters[pIdx] = null;
             player.graveyard.push(target);
@@ -758,11 +781,20 @@ export default function App() {
             ai.graveyard.push(attacker);
             ai.lp = Math.max(0, ai.lp + diff);
             sound.playDestroy();
+          } else {
+            // Equal ATK destroys both Attack Position monsters.
+            const pIdx = player.monsters.indexOf(target);
+            const aIdx = ai.monsters.indexOf(attacker);
+            if (pIdx >= 0) player.monsters[pIdx] = null;
+            if (aIdx >= 0) ai.monsters[aIdx] = null;
+            player.graveyard.push(target);
+            ai.graveyard.push(attacker);
+            sound.playDestroy();
           }
         } else {
           // Direct attack
           attacker.hasAttacked = true;
-          const dmg = attacker.atk || 1500;
+          const dmg = (attacker.atk || 0) + (attacker.attackBonus || 0) || 1500;
           player.lp = Math.max(0, player.lp - dmg);
           sound.playAttack();
           attackAnim = {
@@ -937,53 +969,70 @@ export default function App() {
     const idx = activePlayer.hand.findIndex(c => c.uid === card.uid);
     if (idx < 0) return;
 
-    if (card.subtype === 'Field Spell') {
-      sound.playFieldSpell();
+    // Monster Reborn must let the player choose the exact monster in either Graveyard.
+    if (card.name === 'Monster Reborn' && isP1) {
+      const candidates = [
+        ...state.player.graveyard.filter(c => c.type === 'MONSTER').map(card => ({ card, source: 'playerGY' as const })),
+        ...state.ai.graveyard.filter(c => c.type === 'MONSTER').map(card => ({ card, source: 'aiGY' as const })),
+      ];
+      if (!candidates.length) { addLog('[Monster Reborn] No monster is available in either Graveyard.'); return; }
+      if (state.player.monsters.every(Boolean)) { addLog('[Monster Reborn] Your Monster Zones are full.'); return; }
       setState(prev => {
-        const curP = isP1 ? { ...prev.player } : { ...prev.ai };
-        const [fieldCard] = curP.hand.splice(idx, 1);
-        fieldCard.faceUp = true;
-        curP.fieldSpell = fieldCard;
-        return {
-          ...prev,
-          player: isP1 ? curP : prev.player,
-          ai: isP1 ? prev.ai : curP,
-        };
+        const player = { ...prev.player, hand: [...prev.player.hand], graveyard: [...prev.player.graveyard] };
+        const handIndex = player.hand.findIndex(c => c.uid === card.uid);
+        if (handIndex >= 0) player.graveyard.push(player.hand.splice(handIndex, 1)[0]);
+        return { ...prev, player };
       });
-      card.activateEffect?.({
-        card,
-        owner: activePlayer,
-        opponent: isP1 ? state.ai : state.player,
-        ownerSide: state.activeSide,
-        gameState: state,
-        log: addLog,
-      });
-
-      if (isOnlineMatch) {
-        multiplayer.syncAction('SPELL', { cardName: card.name });
-      }
+      setPendingSelection({ title: 'MONSTER REBORN', description: 'Choose exactly which monster in either Graveyard you want to revive.', candidates, effect: 'REBORN' });
       return;
     }
 
-    setState(prev => {
-      const curP = isP1 ? { ...prev.player } : { ...prev.ai };
-      const [spellCard] = curP.hand.splice(idx, 1);
-      curP.graveyard.push(spellCard);
-      return {
-        ...prev,
-        player: isP1 ? curP : prev.player,
-        ai: isP1 ? prev.ai : curP,
-      };
+    // Resolve effects against cloned duelists, then commit the mutations to React state.
+    // Previously callbacks changed stale state objects, so many implemented card effects only logged text.
+    const clonePlayer = (source: PlayerState): PlayerState => ({
+      ...source,
+      hand: source.hand.map(c => ({ ...c })),
+      deck: source.deck.map(c => ({ ...c })),
+      graveyard: source.graveyard.map(c => ({ ...c })),
+      monsters: source.monsters.map(c => c ? ({ ...c }) : null),
+      spells: source.spells.map(c => c ? ({ ...c }) : null),
+      extraDeck: source.extraDeck.map(c => ({ ...c })),
+      fieldSpell: source.fieldSpell ? ({ ...source.fieldSpell }) : null,
     });
+    const ownerCopy = clonePlayer(activePlayer);
+    const opponentCopy = clonePlayer(isP1 ? state.ai : state.player);
+    const handIndex = ownerCopy.hand.findIndex(c => c.uid === card.uid);
+    if (handIndex < 0) return;
+    const [playedCard] = ownerCopy.hand.splice(handIndex, 1);
 
-    card.activateEffect?.({
-      card,
-      owner: activePlayer,
-      opponent: isP1 ? state.ai : state.player,
+    if (card.subtype === 'Field Spell') {
+      sound.playFieldSpell();
+      // Yu-Gi-Oh! allows only one Field Spell per player: a newly activated one replaces the old one.
+      if (ownerCopy.fieldSpell) ownerCopy.graveyard.push(ownerCopy.fieldSpell);
+      playedCard.faceUp = true;
+      ownerCopy.fieldSpell = playedCard;
+    } else {
+      ownerCopy.graveyard.push(playedCard);
+    }
+
+    const effectResult = card.activateEffect?.({
+      card: playedCard,
+      owner: ownerCopy,
+      opponent: opponentCopy,
       ownerSide: state.activeSide,
       gameState: state,
       log: addLog,
     });
+    const commitEffectState = () => setState(prev => ({
+      ...prev,
+      player: isP1 ? ownerCopy : opponentCopy,
+      ai: isP1 ? opponentCopy : ownerCopy,
+    }));
+    if (effectResult && typeof (effectResult as Promise<unknown>).then === 'function') {
+      (effectResult as Promise<unknown>).then(commitEffectState).catch(err => addLog(`[${card.name}] Effect failed: ${String(err)}`));
+    } else {
+      commitEffectState();
+    }
 
     if (isOnlineMatch) {
       multiplayer.syncAction('SPELL', { cardName: card.name });
@@ -1019,46 +1068,86 @@ export default function App() {
     addLog(`Set 1 ${card.type === 'TRAP' ? 'Trap' : 'Spell'} face-down.`);
   };
 
-  // Activate Hand Effect
+  // Activate Hand Effect — resolve only for the player's own hand; opponent hands stay private.
   const handleActivateHandEffect = (card: CardInstance) => {
     sound.playEffectChime();
-    const isP1 = state.activeSide === 'player';
-    card.handEffect?.({
-      card,
-      owner: isP1 ? state.player : state.ai,
-      opponent: isP1 ? state.ai : state.player,
-      ownerSide: state.activeSide,
-      gameState: state,
-      log: addLog,
-    });
+    const owner = state.player;
+    const opponent = state.ai;
+    if (card.name === 'Elemental HERO Honest Neos') {
+      const candidates = owner.monsters.filter((c): c is CardInstance => !!c && c.name.includes('HERO')).map(card => ({ card, source: 'field' as const }));
+      if (!candidates.length) { addLog('[Honest Neos] You need a HERO monster on your field.'); return; }
+      setPendingSelection({ title: 'HONEST NEOS', description: 'Choose your HERO monster to gain 2500 ATK until the end of this turn.', candidates, effect: 'HONEST_NEOS' });
+      return;
+    }
+    card.handEffect?.({ card, owner, opponent, ownerSide: 'player', gameState: state, log: addLog });
+    setState(prev => ({ ...prev, player: { ...prev.player, hand: [...prev.player.hand], graveyard: [...prev.player.graveyard] }, ai: { ...prev.ai, monsters: [...prev.ai.monsters] } }));
   };
 
-  // Activate GY Effect
+  // GY effects that select a card always open a choice popup instead of silently taking the first card.
   const handleActivateGyEffect = (card: CardInstance) => {
     sound.playEffectChime();
-    const isP1 = state.activeSide === 'player';
-    card.gyEffect?.({
-      card,
-      owner: isP1 ? state.player : state.ai,
-      opponent: isP1 ? state.ai : state.player,
-      ownerSide: state.activeSide,
-      gameState: state,
-      log: addLog,
-    });
+    const owner = gyOwnerSide === 'player' ? state.player : state.ai;
+    const opponent = gyOwnerSide === 'player' ? state.ai : state.player;
+    if (card.name === 'Prank-Kids Dropsies') {
+      const candidates = [
+        ...owner.hand.filter(c => c.name.startsWith('Prank-Kids') && c.name !== card.name).map(card => ({ card, source: 'hand' as const })),
+        ...owner.deck.filter(c => c.name.startsWith('Prank-Kids') && c.name !== card.name).map(card => ({ card, source: 'deck' as const })),
+      ];
+      if (!candidates.length) { addLog('[Prank-Kids Dropsies] No eligible Prank-Kids monster in hand or Deck.'); return; }
+      setPendingSelection({ title: 'PRANK-KIDS DROPSIES', description: 'Choose a Prank-Kids monster to Special Summon in Defense Position.', candidates, effect: 'DROPSIES' });
+      return;
+    }
+    card.gyEffect?.({ card, owner, opponent, ownerSide: gyOwnerSide, gameState: state, log: addLog });
+    setState(prev => ({ ...prev, player: { ...prev.player, hand: [...prev.player.hand], graveyard: [...prev.player.graveyard], monsters: [...prev.player.monsters] }, ai: { ...prev.ai, hand: [...prev.ai.hand], graveyard: [...prev.ai.graveyard], monsters: [...prev.ai.monsters] } }));
   };
 
-  // Activate Monster Effect
+  // Activate Monster Effect — resolve on cloned duel state and commit all effect mutations.
   const handleActivateMonsterSkill = (card: CardInstance) => {
     sound.playEffectChime();
+    if (card.name === 'Monster Reborn') {
+      const candidates = [
+        ...state.player.graveyard.filter(c => c.type === 'MONSTER').map(card => ({ card, source: 'playerGY' as const })),
+        ...state.ai.graveyard.filter(c => c.type === 'MONSTER').map(card => ({ card, source: 'aiGY' as const })),
+      ];
+      if (!candidates.length) { addLog('[Monster Reborn] No monster is available in either Graveyard.'); return; }
+      if (state.player.monsters.every(Boolean)) { addLog('[Monster Reborn] Your Monster Zones are full.'); return; }
+      setPendingSelection({ title: 'MONSTER REBORN', description: 'Choose exactly which monster in either Graveyard you want to revive.', candidates, effect: 'REBORN' });
+      return;
+    }
     const isP1 = state.activeSide === 'player';
-    card.activateEffect?.({
-      card,
-      owner: isP1 ? state.player : state.ai,
-      opponent: isP1 ? state.ai : state.player,
+    const clonePlayer = (source: PlayerState): PlayerState => ({
+      ...source,
+      hand: source.hand.map(c => ({ ...c })),
+      deck: source.deck.map(c => ({ ...c })),
+      graveyard: source.graveyard.map(c => ({ ...c })),
+      monsters: source.monsters.map(c => c ? ({ ...c }) : null),
+      spells: source.spells.map(c => c ? ({ ...c }) : null),
+      extraDeck: source.extraDeck.map(c => ({ ...c })),
+      fieldSpell: source.fieldSpell ? ({ ...source.fieldSpell }) : null,
+    });
+    const ownerCopy = clonePlayer(isP1 ? state.player : state.ai);
+    const opponentCopy = clonePlayer(isP1 ? state.ai : state.player);
+    const fieldCard = ownerCopy.monsters.find(m => m && m.uid === card.uid)
+      || (ownerCopy.fieldSpell?.uid === card.uid ? ownerCopy.fieldSpell : null);
+    if (!fieldCard) { addLog(`[${card.name}] This card is no longer on your field.`); return; }
+    const result = fieldCard.activateEffect?.({
+      card: fieldCard,
+      owner: ownerCopy,
+      opponent: opponentCopy,
       ownerSide: state.activeSide,
       gameState: state,
       log: addLog,
     });
+    const commit = () => setState(prev => ({
+      ...prev,
+      player: isP1 ? ownerCopy : opponentCopy,
+      ai: isP1 ? opponentCopy : ownerCopy,
+    }));
+    if (result && typeof (result as Promise<unknown>).then === 'function') {
+      (result as Promise<unknown>).then(commit).catch(err => addLog(`[${card.name}] Effect failed: ${String(err)}`));
+    } else {
+      commit();
+    }
   };
 
   // Extra Deck Summon
@@ -1442,8 +1531,8 @@ export default function App() {
   }
 
   // Active player hand determination
-  const activeHand = state.activeSide === 'player' ? state.player.hand : state.ai.hand;
-  const activeDuelistName = state.activeSide === 'player' ? state.player.name : state.ai.name;
+  const activeHand = state.player.hand;
+  const activeDuelistName = state.player.name;
 
   // DUEL ARENA SCREEN
   return (
@@ -1512,15 +1601,30 @@ export default function App() {
         onOpenExtra={() => setIsExtraOpen(true)}
       />
 
-      {/* 5. ACTIVE DUELIST'S FANNED HAND */}
+      {/* Opponent hand is represented by card backs only; never reveal CPU/remote player's cards. */}
+      <div className="fixed top-2 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-1 pointer-events-none">
+        <div className={`px-3 py-1 rounded-full border text-[10px] tracking-widest font-['Orbitron'] font-black ${state.activeSide === 'ai' ? 'bg-rose-950/90 border-rose-400 text-rose-200 shadow-[0_0_18px_rgba(244,63,94,.45)]' : 'bg-[#091827]/85 border-sky-500/60 text-sky-200'}`}>
+          {state.ai.name.toUpperCase()} · {state.activeSide === 'ai' ? 'CURRENTLY PLAYING' : 'WAITING'} · {state.phase} PHASE
+        </div>
+        <div className="flex items-end justify-center h-14">
+          {Array.from({ length: Math.min(state.ai.hand.length, 10) }).map((_, i) => (
+            <div key={i} className="w-7 h-10 -ml-2 first:ml-0 rounded border border-amber-400/70 bg-gradient-to-br from-[#243c68] via-[#101e3d] to-[#571f38] shadow-lg flex items-center justify-center" style={{ transform: `rotate(${(i - (Math.min(state.ai.hand.length, 10)-1)/2) * 3}deg)` }}>
+              <div className="w-5 h-8 rounded-sm border border-amber-300/40 bg-[repeating-linear-gradient(45deg,#18294c,#18294c_3px,#253d68_3px,#253d68_6px)]" />
+            </div>
+          ))}
+        </div>
+        <span className="text-[9px] text-slate-300/80 font-['Orbitron']">OPPONENT HAND · {state.ai.hand.length} CARD(S) · FACE-DOWN</span>
+      </div>
+
+      {/* 5. PLAYER'S HAND — always only your own cards, even during opponent's turn */}
       <PlayerHand
         hand={activeHand}
         selectedCardUid={state.selectedCardUid}
-        onSelectCard={(c) => setState(prev => ({ ...prev, selectedCardUid: c.uid }))}
-        onCardAction={handleHandCardAction}
+        onSelectCard={(c) => { if (state.activeSide === 'player') setState(prev => ({ ...prev, selectedCardUid: c.uid })); }}
+        onCardAction={(c) => { if (state.activeSide === 'player') handleHandCardAction(c); }}
         ownerName={activeDuelistName}
-        isLocal2P={state.gameMode === 'LOCAL_2P'}
-        activeSide={state.activeSide}
+        isLocal2P={false}
+        activeSide="player"
       />
 
       {/* 6. STATUS LOG BANNER */}
@@ -1651,6 +1755,67 @@ export default function App() {
         }}
         onCancel={() => setTributeState(null)}
       />
+
+      {pendingSelection && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="w-full max-w-4xl max-h-[85vh] overflow-hidden rounded-2xl border border-amber-400/70 bg-[#081525] shadow-[0_0_50px_rgba(245,158,11,.2)]">
+            <div className="px-5 py-4 border-b border-sky-900 flex items-start justify-between gap-4">
+              <div><h2 className="font-['Orbitron'] text-amber-200 font-black tracking-widest">{pendingSelection.title}</h2><p className="text-sm text-slate-300 mt-1">{pendingSelection.description}</p></div>
+              <button onClick={() => setPendingSelection(null)} className="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 text-sm">Cancel</button>
+            </div>
+            <div className="p-4 overflow-y-auto grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 max-h-[65vh]">
+              {pendingSelection.candidates.map((candidate, idx) => (
+                <button key={`${candidate.card.uid}-${candidate.source}-${idx}`} onClick={() => {
+                  const choice = candidate;
+                  if (pendingSelection.effect === 'HONEST_NEOS') {
+                    setState(prev => {
+                      const player = { ...prev.player, hand: [...prev.player.hand], graveyard: [...prev.player.graveyard], monsters: [...prev.player.monsters] };
+                      const handIndex = player.hand.findIndex(c => c.name === 'Elemental HERO Honest Neos');
+                      if (handIndex >= 0) player.graveyard.push(player.hand.splice(handIndex, 1)[0]);
+                      const targetIndex = player.monsters.findIndex(c => c && c.uid === choice.card.uid);
+                      if (targetIndex >= 0 && player.monsters[targetIndex]) player.monsters[targetIndex]!.attackBonus += 2500;
+                      return { ...prev, player };
+                    });
+                    addLog(`[Honest Neos] ${choice.card.name} gains 2500 ATK until the end of the turn.`);
+                  } else if (pendingSelection.effect === 'DROPSIES') {
+                    const owner = gyOwnerSide === 'player' ? state.player : state.ai;
+                    const empty = owner.monsters.findIndex(m => m === null);
+                    if (empty < 0) { addLog('No empty Monster Zone available.'); setPendingSelection(null); return; }
+                    setState(prev => {
+                      const nextOwner = gyOwnerSide === 'player' ? { ...prev.player, hand: [...prev.player.hand], deck: [...prev.player.deck], monsters: [...prev.player.monsters] } : { ...prev.ai, hand: [...prev.ai.hand], deck: [...prev.ai.deck], monsters: [...prev.ai.monsters] };
+                      const list = choice.source === 'hand' ? nextOwner.hand : nextOwner.deck;
+                      const idxCard = list.findIndex(c => c.uid === choice.card.uid);
+                      if (idxCard >= 0) { const [picked] = list.splice(idxCard, 1); picked.faceUp = true; picked.position = 'DEFENSE'; picked.summonKind = 'SPECIAL'; picked.hasAttacked = false; nextOwner.monsters[empty] = picked; }
+                      nextOwner.lp = Math.min(8000, nextOwner.lp + 1000);
+                      return gyOwnerSide === 'player' ? { ...prev, player: nextOwner } : { ...prev, ai: nextOwner };
+                    });
+                    addLog(`[Prank-Kids Dropsies] gained 1000 LP and Special Summoned ${choice.card.name} from ${choice.source === 'hand' ? 'hand' : 'Deck'} in Defense Position.`);
+                  } else {
+                    const empty = state.player.monsters.findIndex(m => m === null);
+                    if (empty < 0) { addLog('Your Monster Zones are full.'); setPendingSelection(null); return; }
+                    setState(prev => {
+                      const player = { ...prev.player, monsters: [...prev.player.monsters], graveyard: [...prev.player.graveyard] };
+                      const ai = { ...prev.ai, graveyard: [...prev.ai.graveyard] };
+                      const source = choice.source === 'playerGY' ? player.graveyard : ai.graveyard;
+                      const iCard = source.findIndex(c => c.uid === choice.card.uid);
+                      if (iCard >= 0) { const [picked] = source.splice(iCard, 1); picked.faceUp = true; picked.position = 'ATTACK'; picked.summonKind = 'SPECIAL'; picked.hasAttacked = false; player.monsters[empty] = picked; }
+                      return { ...prev, player, ai };
+                    });
+                    addLog(`[Monster Reborn] You chose ${choice.card.name} from the ${choice.source === 'playerGY' ? 'your' : 'opponent'} Graveyard.`);
+                  }
+                  setPendingSelection(null);
+                  setIsGyOpen(false);
+                }} className="text-left rounded-xl overflow-hidden border border-sky-800 hover:border-amber-300 bg-[#0d2034] hover:bg-[#142e48] transition-all p-2">
+                  <img src={candidate.card.art} alt={candidate.card.name} className="w-full aspect-[3/4] object-contain bg-black/30 rounded" onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }} />
+                  <span className="block text-xs font-bold text-white mt-2">{candidate.card.name}</span>
+                  <span className="block text-[10px] text-sky-300 mt-1">{candidate.source === 'hand' ? 'YOUR HAND' : candidate.source === 'deck' ? 'YOUR DECK' : candidate.source === 'playerGY' ? 'YOUR GRAVEYARD' : candidate.source === 'aiGY' ? 'OPPONENT GRAVEYARD' : 'YOUR FIELD'}</span>
+                  <span className="block text-[10px] text-amber-200 mt-1">ATK {candidate.card.atk ?? '—'} / DEF {candidate.card.def ?? '—'}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       <DuelResultModal
         result={state.result}

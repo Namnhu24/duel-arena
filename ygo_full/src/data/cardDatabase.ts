@@ -447,7 +447,7 @@ export const CARD_DATABASE: CardDefinition[] = [
     }
   },
   {
-    id: 12948312,
+    id: 557251,
     name: 'Prank-Kids Dropsies',
     type: 'MONSTER',
     subtype: 'Effect',
@@ -458,23 +458,10 @@ export const CARD_DATABASE: CardDefinition[] = [
     def: 1000,
     modelType: 'rock_prank',
     hasGyEffect: true,
-    art: cardArt(12948312),
-    text: 'If this card is sent to the GY as material for a Fusion or Link Summon of a "Prank-Kids" monster: You can gain 1000 LP, then you can Special Summon 1 "Prank-Kids" monster from your hand or Deck.',
-    gyEffect: ({ owner, log }) => {
-      owner.lp = Math.min(8000, owner.lp + 1000);
-      log(`[Prank-Kids Dropsies] recovered 1000 LP! Current LP: ${owner.lp}`);
-      const kidIdx = owner.deck.findIndex(c => c.name.startsWith('Prank-Kids'));
-      const emptySlot = owner.monsters.findIndex(m => m === null);
-      if (kidIdx >= 0 && emptySlot >= 0) {
-        const [kid] = owner.deck.splice(kidIdx, 1);
-        kid.faceUp = true;
-        kid.position = 'DEFENSE';
-        kid.placedTurn = 1;
-        kid.hasAttacked = false;
-        kid.summonKind = 'SPECIAL';
-        owner.monsters[emptySlot] = kid;
-        log(`[Prank-Kids Dropsies] Special Summoned ${kid.name} from Deck!`);
-      }
+    art: cardArt(557251),
+    text: 'If this card is sent to the GY as material for the Fusion or Link Summon of a "Prank-Kids" monster: You can gain 1000 LP, then you can Special Summon 1 "Prank-Kids" monster from your hand or Deck in Defense Position, except "Prank-Kids Dropsies". You can only use this effect of "Prank-Kids Dropsies" once per turn.',
+    gyEffect: ({ log }) => {
+      log('[Prank-Kids Dropsies] Choose a legal Prank-Kids monster in your hand or Deck to Special Summon in Defense Position.');
       return true;
     }
   },
@@ -1098,7 +1085,38 @@ export const CARD_DATABASE: CardDefinition[] = [
     subtype: 'Counter Trap',
     art: cardArt(41420027),
     text: 'When a monster would be Summoned, OR a Spell/Trap Card is activated: Pay half your LP; negate the Summon or activation, and if you do, destroy that card.'
-  }
+  },
+  // HERO archetype expansion: core Elemental, Masked, and Xtra HERO cards.
+  { id: 40044918, name: 'Elemental HERO Stratos', type: 'MONSTER', subtype: 'Effect', attribute: 'WIND', race: 'Warrior', level: 4, atk: 1800, def: 300, art: cardArt(40044918), modelType: 'warrior', text: 'If this card is Normal or Special Summoned: You can add 1 HERO monster from your Deck to your hand, except Elemental HERO Stratos, or destroy Spell/Trap Cards up to the number of HERO monsters you control. Once per turn.' },
+  { id: 50720316, name: 'Elemental HERO Shadow Mist', type: 'MONSTER', subtype: 'Effect', attribute: 'DARK', race: 'Warrior', level: 4, atk: 1000, def: 1500, art: cardArt(50720316), modelType: 'warrior', hasGyEffect: true, text: 'If this card is Special Summoned: You can add 1 Change Quick-Play Spell from your Deck to your hand. If this card is sent to the GY: You can add 1 HERO monster from your Deck to your hand, except Elemental HERO Shadow Mist. You can only use 1 effect per turn.' },
+  { id: 45195443, name: 'Elemental HERO Solid Soldier', type: 'MONSTER', subtype: 'Effect', attribute: 'EARTH', race: 'Warrior', level: 4, atk: 1300, def: 1100, art: cardArt(45195443), modelType: 'warrior', text: 'When this card is Normal Summoned: You can Special Summon 1 Level 4 or lower HERO monster from your hand. If sent from the Monster Zone to the GY by a Spell effect: You can Special Summon 1 other HERO monster from your GY.' },
+  { id: 14124483, name: 'Elemental HERO Honest Neos', type: 'MONSTER', subtype: 'Effect', attribute: 'LIGHT', race: 'Warrior', level: 7, atk: 2500, def: 2000, art: cardArt(14124483), modelType: 'warrior', hasHandEffect: true, text: 'During either player’s turn: You can discard this card; 1 HERO monster you control gains 2500 ATK until the end of this turn.', handEffect: ({ card, owner, log }) => { const idx = owner.hand.findIndex(c => c.uid === card.uid); const target = owner.monsters.find(m => m && m.name.includes('HERO')); if (idx >= 0 && target) { const [discarded] = owner.hand.splice(idx, 1); owner.graveyard.push(discarded); target.attackBonus += 2500; log(`[Honest Neos] ${target.name} gains 2500 ATK until the end of the turn.`); return true; } log('[Honest Neos] You need a HERO monster on your field.'); } },
+  { id: 89943723, name: 'Elemental HERO Neos', type: 'MONSTER', subtype: 'Normal', attribute: 'LIGHT', race: 'Warrior', level: 7, atk: 2500, def: 2000, art: cardArt(89943723), modelType: 'warrior', text: 'A new Elemental HERO sent by Neos Space. He brings hope to the world and can contact Fusion with Neo-Spacians.' },
+  { id: 21844576, name: 'Elemental HERO Avian', type: 'MONSTER', subtype: 'Normal', attribute: 'WIND', race: 'Warrior', level: 3, atk: 1000, def: 1000, art: cardArt(21844576), modelType: 'warrior', text: 'A winged Elemental HERO who wheels through the sky and strikes with a gust of wind.' },
+  { id: 58932616, name: 'Elemental HERO Burstinatrix', type: 'MONSTER', subtype: 'Normal', attribute: 'FIRE', race: 'Warrior', level: 3, atk: 1200, def: 800, art: cardArt(58932616), modelType: 'warrior', text: 'A fiery Elemental HERO who burns her enemies with blazing passion.' },
+  { id: 20721928, name: 'Elemental HERO Sparkman', type: 'MONSTER', subtype: 'Normal', attribute: 'LIGHT', race: 'Warrior', level: 4, atk: 1600, def: 1400, art: cardArt(20721928), modelType: 'warrior', text: 'An Elemental HERO who can use light to power up his attacks.' },
+  { id: 79979666, name: 'Elemental HERO Bubbleman', type: 'MONSTER', subtype: 'Effect', attribute: 'WATER', race: 'Warrior', level: 4, atk: 800, def: 1200, art: cardArt(79979666), modelType: 'warrior', text: 'If you control no cards and have no cards in your hand except this card, you can Special Summon it from your hand; then draw 2 cards if it was the only card you controlled.' },
+  { id: 22908820, name: 'Elemental HERO Sunrise', type: 'MONSTER', subtype: 'Fusion', extraKind: 'FUSION', attribute: 'LIGHT', race: 'Warrior', level: 7, atk: 2500, def: 1200, art: cardArt(22908820), modelType: 'warrior', materialText: '2 HERO monsters with different Attributes', text: 'If this card is Special Summoned: You can add 1 Miracle Fusion from your Deck to your hand. If a HERO monster you control attacks, your opponent’s monsters lose 200 ATK for each different Attribute among HERO monsters you control.' },
+  { id: 40854197, name: 'Elemental HERO Absolute Zero', type: 'MONSTER', subtype: 'Fusion', extraKind: 'FUSION', attribute: 'WATER', race: 'Warrior', level: 8, atk: 2500, def: 2000, art: cardArt(40854197), modelType: 'warrior', materialText: '1 HERO monster + 1 WATER monster', text: 'Gains 500 ATK for each WATER monster on the field, except this card. If this card leaves the field: Destroy all monsters your opponent controls.' },
+  { id: 58481572, name: 'Masked HERO Dark Law', type: 'MONSTER', subtype: 'Fusion', extraKind: 'FUSION', attribute: 'DARK', race: 'Warrior', level: 6, atk: 2400, def: 1800, art: cardArt(58481572), modelType: 'warrior', materialText: 'Must be Special Summoned by Mask Change', text: 'Any card sent to your opponent’s GY is banished instead. Once per turn, if your opponent adds a card(s) from the Deck to their hand, except during the Draw Phase or Damage Step: You can banish 1 random card from their hand.' },
+  { id: 88086137, name: 'Masked HERO Anki', type: 'MONSTER', subtype: 'Fusion', extraKind: 'FUSION', attribute: 'DARK', race: 'Warrior', level: 8, atk: 2800, def: 1200, art: cardArt(88086137), modelType: 'warrior', materialText: 'Must be Special Summoned by Mask Change', text: 'Can attack directly, but battle damage inflicted to your opponent by this effect is halved. If this card destroys an opponent’s monster by battle: You can add 1 Change Quick-Play Spell from your Deck to your hand.' },
+  { id: 46759931, name: 'Vision HERO Trinity', type: 'MONSTER', subtype: 'Fusion', extraKind: 'FUSION', attribute: 'DARK', race: 'Warrior', level: 8, atk: 2500, def: 2000, art: cardArt(46759931), modelType: 'warrior', materialText: '3 HERO monsters', text: 'If this card is Fusion Summoned, it gains 2500 ATK. Cannot attack directly. Can make up to 3 attacks during each Battle Phase.' },
+  { id: 21143940, name: 'Mask Change', type: 'SPELL', subtype: 'Quick-Play Spell', art: cardArt(21143940), text: 'Target 1 HERO monster you control; send it to the GY, and if you do, Special Summon from your Extra Deck 1 Masked HERO monster with the same Attribute but a different name.' },
+  { id: 45906428, name: 'Miracle Fusion', type: 'SPELL', subtype: 'Normal Spell', art: cardArt(45906428), text: 'Fusion Summon 1 Elemental HERO Fusion Monster from your Extra Deck, by banishing Fusion Materials listed on it from your field or GY.' },
+  { id: 213326, name: 'E - Emergency Call', type: 'SPELL', subtype: 'Normal Spell', art: cardArt(213326), text: 'Add 1 Elemental HERO monster from your Deck to your hand.' },
+  { id: 89882100, name: 'A Hero Lives', type: 'SPELL', subtype: 'Normal Spell', art: cardArt(89882100), text: 'If you control no face-up monsters: Pay half your LP; Special Summon 1 Level 4 or lower Elemental HERO monster from your Deck.' },
+  { id: 19680539, name: 'Reinforcement of the Army', type: 'SPELL', subtype: 'Normal Spell', art: cardArt(19680539), text: 'Add 1 Level 4 or lower Warrior monster from your Deck to your hand.' },
+  { id: 56532353, name: 'Skyscraper', type: 'SPELL', subtype: 'Field Spell', art: cardArt(56532353), hasFieldEffect: true, text: 'When an Elemental HERO monster you control attacks an opponent’s monster with higher ATK, the attacking monster gains 1000 ATK during damage calculation only.' },
+  { id: 41517921, name: 'Elemental HERO The Shining', type: 'MONSTER', subtype: 'Fusion', extraKind: 'FUSION', attribute: 'LIGHT', race: 'Warrior', level: 8, atk: 2600, def: 2100, art: cardArt(41517921), modelType: 'warrior', materialText: '1 Elemental HERO monster + 1 LIGHT monster', text: 'Gains 300 ATK for each of your banished Elemental HERO monsters. If this card is sent from the field to the GY: You can target up to 2 of your banished Elemental HERO monsters; add them to your hand.' },
+  { id: 96256417, name: 'Xtra HERO Cross Crusader', type: 'MONSTER', subtype: 'Link', extraKind: 'LINK', attribute: 'DARK', race: 'Warrior', linkRating: 2, atk: 1600, art: cardArt(96256417), modelType: 'warrior', materialText: '2 HERO monsters', text: 'If this card is Link Summoned: You can target 1 HERO monster in your GY; add it to your hand. You can Tribute 1 HERO monster; add 1 HERO monster with a different name from your Deck to your hand. Once per turn.' },
+  { id: 36098706, name: 'Xtra HERO Wonder Driver', type: 'MONSTER', subtype: 'Link', extraKind: 'LINK', attribute: 'LIGHT', race: 'Warrior', linkRating: 2, atk: 1900, art: cardArt(36098706), modelType: 'warrior', materialText: '2 HERO monsters', text: 'If a HERO monster is Special Summoned to a zone this card points to: You can target a Polymerization or Change Quick-Play Spell in your GY; Set it to your field.' },
+  { id: 30757127, name: 'Xtra HERO Dread Decimator', type: 'MONSTER', subtype: 'Link', extraKind: 'LINK', attribute: 'DARK', race: 'Warrior', linkRating: 3, atk: 2500, art: cardArt(30757127), modelType: 'warrior', materialText: '2+ HERO monsters', text: 'All HERO monsters you control gain 100 ATK for each HERO monster in your GY. Monsters this card points to inflict piercing battle damage.' },
+
+  { id: 53639887, name: 'Elemental HERO Liquid Soldier', type: 'MONSTER', subtype: 'Effect', attribute: 'WATER', race: 'Warrior', level: 4, atk: 1400, def: 1300, art: cardArt(53639887), modelType: 'warrior', text: 'When Normal Summoned: You can target 1 Level 4 or lower HERO monster in your GY, except Elemental HERO Liquid Soldier; Special Summon it. If used as Fusion Material for a HERO monster: You can draw 2 cards, then discard 1 card.' },
+  { id: 63060238, name: 'Elemental HERO Blazeman', type: 'MONSTER', subtype: 'Effect', attribute: 'FIRE', race: 'Warrior', level: 4, atk: 1200, def: 1800, art: cardArt(63060238), modelType: 'warrior', text: 'If this card is Normal or Special Summoned: You can add 1 Polymerization from your Deck to your hand. Once per turn: You can send 1 Elemental HERO monster from your Deck to the GY; this card’s Attribute and ATK become that monster’s until the end of this turn.' },
+  { id: 48996514, name: 'Elemental HERO Escuridao', type: 'MONSTER', subtype: 'Fusion', extraKind: 'FUSION', attribute: 'DARK', race: 'Warrior', level: 8, atk: 2500, def: 2000, art: cardArt(48996514), modelType: 'warrior', materialText: '1 Elemental HERO monster + 1 DARK monster', text: 'Gains 100 ATK for each Elemental HERO monster in your GY.' },
+  { id: 16304628, name: 'Elemental HERO Gaia', type: 'MONSTER', subtype: 'Fusion', extraKind: 'FUSION', attribute: 'EARTH', race: 'Warrior', level: 6, atk: 2200, def: 2600, art: cardArt(16304628), modelType: 'warrior', materialText: '1 HERO monster + 1 EARTH monster', text: 'When this card is Fusion Summoned: You can target 1 face-up monster your opponent controls; its ATK is halved, and this card gains that lost ATK.' },
+
 ];
 
 export const EXTRA_DECK_DATABASE: CardDefinition[] = CARD_DATABASE.filter(c => 

@@ -335,8 +335,9 @@ export const BattlefieldOverlay: React.FC<BattlefieldOverlayProps> = ({
                         card.position === 'DEFENSE' ? 'rotate-90 scale-90' : ''
                       }`}
                     />
-                    <div className="absolute bottom-0 left-0 right-0 bg-black/85 px-1 py-0.5 text-[9px] font-['Orbitron'] font-black text-center text-amber-300">
-                      {(card.atk ?? 0) + (card.attackBonus || 0)}
+                    <div className="absolute bottom-0 left-0 right-0 bg-black/90 px-1 py-0.5 text-[8px] font-['Orbitron'] font-black text-center leading-tight">
+                      <span className="text-amber-300">ATK {(card.atk ?? 0) + (card.attackBonus || 0)}</span>
+                      {card.subtype !== 'Link' && <span className="text-sky-300 ml-1">DEF {(card.def ?? 0) + (card.defenseBonus || 0)}</span>}
                     </div>
                     {isSelectedAttacker && (
                       <div className="absolute -top-3 -right-2 bg-amber-400 text-stone-950 rounded-full p-1 shadow-lg">
