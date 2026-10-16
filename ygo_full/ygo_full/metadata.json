@@ -1,0 +1,6 @@
+{
+  "name": "Yu-Gi-Oh! Master Duel Arena 3D",
+  "description": "Realistic Yu-Gi-Oh! Master Duel 3D arena with wide battlefield, center phase controls, 3D monster holograms, hand and graveyard effects, field spells, and deep extra deck summoning.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
