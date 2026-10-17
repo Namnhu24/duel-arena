@@ -894,9 +894,6 @@ export const CARD_DATABASE: CardDefinition[] = [
   },
   {
     id: 18514525,
-  { id: 57243135, name: 'Prank-Kids Weather Washer', type: 'MONSTER', subtype: 'Fusion', extraKind: 'FUSION', attribute: 'WATER', race: 'Aqua', level: 5, atk: 2000, def: 0, art: cardArt(57243135), modelType: 'rock_prank', materialText: '2 "Prank-Kids" monsters', text: 'If your Prank-Kids monster attacks, your opponent cannot activate cards or effects until the end of the Damage Step. During your opponent’s turn (Quick Effect): You can Tribute this card, then target 2 Prank-Kids non-Fusion monsters with different names in your GY; Special Summon them. They cannot be destroyed by battle this turn.' },
-  { id: 53639887, name: 'Divine Temple of the Snake-Eye', type: 'SPELL', subtype: 'Field Spell', art: cardArt(53639887), hasFieldEffect: true, text: 'When this card is activated: You can place 1 Snake-Eye monster from your hand, Deck, or GY face-up in its owner’s Spell & Trap Zone as a Continuous Spell. Level 1 FIRE monsters you control gain 1100 ATK. Once per turn, if your opponent Normal or Special Summons a monster (except during the Damage Step): You can target 1 Monster Card treated as a Continuous Spell; Special Summon it to your field.' },
-  { id: 56532353, name: 'Neo Blue-Eyes Ultimate Dragon', type: 'MONSTER', subtype: 'Fusion', extraKind: 'FUSION', attribute: 'LIGHT', race: 'Dragon', level: 12, atk: 4500, def: 3800, art: cardArt(56532353), modelType: 'blue_eyes', materialText: '3 Blue-Eyes White Dragon', text: 'At the end of the Damage Step, if this is the only face-up card you control and this Fusion Summoned card attacked: You can send 1 Blue-Eyes Fusion Monster from your Extra Deck to the GY; this card can attack again in a row, up to twice per turn.' },
     name: 'Prank-Kids Rocket Ride',
     type: 'MONSTER',
     subtype: 'Fusion',
@@ -933,6 +930,10 @@ export const CARD_DATABASE: CardDefinition[] = [
       }
     }
   },
+
+  { id: 57243135, name: 'Prank-Kids Weather Washer', type: 'MONSTER', subtype: 'Fusion', extraKind: 'FUSION', attribute: 'WATER', race: 'Aqua', level: 5, atk: 2000, def: 0, art: cardArt(57243135), modelType: 'rock_prank', materialText: '2 "Prank-Kids" monsters', text: 'If your Prank-Kids monster attacks, your opponent cannot activate cards or effects until the end of the Damage Step. During your opponent’s turn (Quick Effect): You can Tribute this card, then target 2 Prank-Kids non-Fusion monsters with different names in your GY; Special Summon them. They cannot be destroyed by battle this turn.' },
+  { id: 53639887, name: 'Divine Temple of the Snake-Eye', type: 'SPELL', subtype: 'Field Spell', art: cardArt(53639887), hasFieldEffect: true, text: 'When this card is activated: You can place 1 Snake-Eye monster from your hand, Deck, or GY face-up in its owner’s Spell & Trap Zone as a Continuous Spell. Level 1 FIRE monsters you control gain 1100 ATK. Once per turn, if your opponent Normal or Special Summons a monster (except during the Damage Step): You can target 1 Monster Card treated as a Continuous Spell; Special Summon it to your field.' },
+  { id: 56532353, name: 'Neo Blue-Eyes Ultimate Dragon', type: 'MONSTER', subtype: 'Fusion', extraKind: 'FUSION', attribute: 'LIGHT', race: 'Dragon', level: 12, atk: 4500, def: 3800, art: cardArt(56532353), modelType: 'blue_eyes', materialText: '3 Blue-Eyes White Dragon', text: 'At the end of the Damage Step, if this is the only face-up card you control and this Fusion Summoned card attacked: You can send 1 Blue-Eyes Fusion Monster from your Extra Deck to the GY; this card can attack again in a row, up to twice per turn.' },
 
   // ==========================================
   // SPELLS & TRAPS
