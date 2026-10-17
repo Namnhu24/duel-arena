@@ -154,13 +154,14 @@ export default function App() {
   const [actionCard, setActionCard] = useState<CardInstance | null>(null);
   const [actionList, setActionList] = useState<CardActionItem[]>([]);
   const [pendingSummonChoice, setPendingSummonChoice] = useState<CardInstance | null>(null);
+  const [pendingSummonIntent, setPendingSummonIntent] = useState<'SUMMON' | 'SET'>('SUMMON');
   const [isMuted, setIsMuted] = useState(false);
   const [pendingSelection, setPendingSelection] = useState<{ title: string; description: string; candidates: { card: CardInstance; source: 'hand' | 'deck' | 'playerGY' | 'aiGY' | 'field' }[]; effect: 'DROPSIES' | 'REBORN' | 'HONEST_NEOS' } | null>(null);
 
   // Tribute Selection Modal State
   const [tributeState, setTributeState] = useState<{
     card: CardInstance;
-    mode: 'SUMMON' | 'SET';
+    mode: 'SUMMON' | 'DEFENSE' | 'SET';
     requiredCount: number;
   } | null>(null);
 
@@ -1023,7 +1024,7 @@ export default function App() {
   };
 
   // Normal / Tribute Summon request
-  const requestNormalSummon = (card: CardInstance, mode: 'SUMMON' | 'SET') => {
+  const requestNormalSummon = (card: CardInstance, mode: 'SUMMON' | 'DEFENSE' | 'SET') => {
     if (state.normalSummonUsed) {
       addLog('You have already used your Normal Summon/Set this turn.');
       return;
@@ -1052,7 +1053,7 @@ export default function App() {
   };
 
   // Execute Summon
-  const executeSummon = (card: CardInstance, mode: 'SUMMON' | 'SET', tributeUids: number[]) => {
+  const executeSummon = (card: CardInstance, mode: 'SUMMON' | 'DEFENSE' | 'SET', tributeUids: number[]) => {
     const isP1 = state.activeSide === 'player';
     const activePlayer = isP1 ? state.player : state.ai;
 
@@ -1080,7 +1081,7 @@ export default function App() {
 
       const slot = curP.monsters.findIndex(m => m === null);
       const [summoned] = curP.hand.splice(idx, 1);
-      summoned.faceUp = mode === 'SUMMON';
+      summoned.faceUp = mode !== 'SET';
       summoned.position = mode === 'SUMMON' ? 'ATTACK' : 'DEFENSE';
       summoned.placedTurn = prev.turn;
       summoned.hasAttacked = false;
@@ -1090,7 +1091,7 @@ export default function App() {
         multiplayer.syncAction('SUMMON', {
           cardName: card.name,
           slotIndex: slot,
-          faceUp: mode === 'SUMMON',
+          faceUp: mode !== 'SET',
           position: summoned.position,
         });
       }
@@ -1105,9 +1106,9 @@ export default function App() {
 
     const isTribute = tributeUids.length > 0;
     addLog(
-      mode === 'SUMMON'
-        ? `Normal Summoned [${card.name}] (ATK ${card.atk} / DEF ${card.def})${isTribute ? ` with ${tributeUids.length} Tribute(s)` : ''}!`
-        : `Set [${card.name}] face-down${isTribute ? ` with ${tributeUids.length} Tribute(s)` : ''}.`
+      mode === 'SET'
+        ? `Set [${card.name}] face-down in Defense Position${isTribute ? ` with ${tributeUids.length} Tribute(s)` : ''}.`
+        : `Normal Summoned [${card.name}] face-up in ${mode === 'DEFENSE' ? 'Defense' : 'Attack'} Position (ATK ${card.atk} / DEF ${card.def})${isTribute ? ` with ${tributeUids.length} Tribute(s)` : ''}!`
     );
   };
 
@@ -1554,7 +1555,7 @@ export default function App() {
 
         if (card.activateEffect) {
           actions.push({
-            label: 'Activate Monster Effect',
+            label: 'Activate Effect',
             desc: card.text.slice(0, 45) + '...',
             tone: 'primary',
             run: () => handleActivateMonsterSkill(card),
@@ -1579,15 +1580,15 @@ export default function App() {
       if (!state.normalSummonUsed && isMainPhase) {
         const tributes = getRequiredTributes(card.level || 1);
         actions.push({
-          label: tributes > 0 ? `Tribute Summon (${tributes} Tribute${tributes > 1 ? 's' : ''})` : 'Normal Summon',
+          label: tributes > 0 ? `Summon (${tributes} Tribute${tributes > 1 ? 's' : ''})` : 'Summon',
           desc: `Level ${card.level} · ATK ${card.atk} / DEF ${card.def}`,
           tone: 'primary',
-          run: () => setPendingSummonChoice(card),
+          run: () => { setPendingSummonIntent('SUMMON'); setPendingSummonChoice(card); },
         });
         actions.push({
-          label: tributes > 0 ? `Tribute Set (${tributes} Tribute${tributes > 1 ? 's' : ''})` : 'Set Monster',
+          label: tributes > 0 ? `Set (${tributes} Tribute${tributes > 1 ? 's' : ''})` : 'Set',
           desc: 'Place face-down in Defense Position',
-          run: () => setPendingSummonChoice(card),
+          run: () => { setPendingSummonIntent('SET'); setPendingSummonChoice(card); },
         });
       }
 
@@ -1936,10 +1937,16 @@ export default function App() {
                 {pendingSummonChoice.type === 'MONSTER' && <p className="mt-2 text-xs font-bold text-white">ATK {pendingSummonChoice.atk ?? 0} / DEF {pendingSummonChoice.def ?? 0}</p>}
               </div>
             </div>
-            <p className="mt-4 text-sm text-stone-200">Choose how to place this monster:</p>
+            <p className="mt-4 text-sm text-stone-200">{pendingSummonIntent === 'SET' ? 'Set this monster face-down?' : 'Choose summon position:'}</p>
             <div className="mt-3 grid grid-cols-2 gap-3">
-              <button onClick={() => { const c = pendingSummonChoice; setPendingSummonChoice(null); requestNormalSummon(c, 'SUMMON'); }} className="rounded-xl border border-amber-400 bg-amber-500 px-3 py-3 text-sm font-bold text-black hover:bg-amber-400">✓ Face-up Attack</button>
-              <button onClick={() => { const c = pendingSummonChoice; setPendingSummonChoice(null); requestNormalSummon(c, 'SET'); }} className="rounded-xl border border-sky-500 bg-sky-950 px-3 py-3 text-sm font-bold text-sky-100 hover:bg-sky-900">▣ Face-down Defense</button>
+              {pendingSummonIntent === 'SET' ? (
+                <button onClick={() => { const c = pendingSummonChoice; setPendingSummonChoice(null); requestNormalSummon(c, 'SET'); }} className="col-span-2 rounded-xl border border-sky-500 bg-sky-950 px-3 py-3 text-sm font-bold text-sky-100 hover:bg-sky-900">▣ Confirm Set · Face-down Defense</button>
+              ) : (
+                <>
+                  <button onClick={() => { const c = pendingSummonChoice; setPendingSummonChoice(null); requestNormalSummon(c, 'SUMMON'); }} className="rounded-xl border border-amber-400 bg-amber-500 px-3 py-3 text-sm font-bold text-black hover:bg-amber-400">⚔ Face-up Attack</button>
+                  <button onClick={() => { const c = pendingSummonChoice; setPendingSummonChoice(null); requestNormalSummon(c, 'DEFENSE'); }} className="rounded-xl border border-sky-500 bg-sky-950 px-3 py-3 text-sm font-bold text-sky-100 hover:bg-sky-900">🛡 Face-up Defense</button>
+                </>
+              )}
             </div>
             <button onClick={() => setPendingSummonChoice(null)} className="mt-3 w-full rounded-lg border border-rose-500/60 py-2 text-sm text-rose-200 hover:bg-rose-950/60">✕ Cancel</button>
           </div>
