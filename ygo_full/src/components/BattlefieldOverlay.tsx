@@ -188,8 +188,10 @@ export const BattlefieldOverlay: React.FC<BattlefieldOverlayProps> = ({
                       )}
                     </div>
                   ) : (
-                    <div className="w-full h-full bg-[#1b2533] border border-stone-500 flex items-center justify-center text-[10px] text-stone-300 font-bold rotate-90 scale-90">
-                      DEF
+                    <div className="w-full h-full rounded-sm border border-amber-400/70 bg-[radial-gradient(ellipse_at_center,#31517a_0%,#172744_58%,#091321_100%)] flex items-center justify-center rotate-90 scale-90 shadow-inner overflow-hidden">
+                      <div className="w-[82%] h-[88%] rounded-sm border border-amber-300/50 bg-[repeating-linear-gradient(45deg,rgba(224,183,75,.12),rgba(224,183,75,.12)_3px,transparent_3px,transparent_7px)] flex items-center justify-center">
+                        <div className="w-7 h-7 rounded-full border border-sky-300/60 bg-[#071426]/80 shadow-[0_0_10px_rgba(56,189,248,.3)]" />
+                      </div>
                     </div>
                   )
                 ) : (
@@ -363,7 +365,7 @@ export const BattlefieldOverlay: React.FC<BattlefieldOverlayProps> = ({
         {/* Player Spell & Trap Zones (5 Zones) */}
         <div className="flex items-center justify-center gap-2 md:gap-3.5 w-full max-w-4xl">
           {/* Player Extra Deck Plinth */}
-          <div className="w-[62px] h-[90px] md:w-[72px] md:h-[105px] rounded-lg border border-amber-500/60 bg-[#241a0d]/60 flex flex-col items-center justify-center text-center">
+          <div className={`w-[62px] h-[90px] md:w-[72px] md:h-[105px] rounded-lg border bg-[#241a0d]/60 flex flex-col items-center justify-center text-center transition-all ${state.player.extraDeck.length > 0 && state.player.monsters.filter(Boolean).length >= 2 ? 'border-amber-300 ring-2 ring-amber-400 shadow-[0_0_22px_rgba(251,191,36,.85)] animate-pulse' : 'border-amber-500/60'}`}>
             <Layers className="w-4 h-4 text-amber-400 mb-1" />
             <span className="text-[9px] font-['Orbitron'] text-amber-300 font-bold">EXTRA</span>
             <span className="text-xs font-['Orbitron'] text-white font-extrabold">{state.player.extraDeck.length}</span>

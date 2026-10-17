@@ -129,8 +129,10 @@ export const ExtraDeckModal: React.FC<ExtraDeckModalProps> = ({
                     }}
                     className={`cursor-pointer rounded-xl overflow-hidden border p-2 bg-[#0e2133] transition-all ${
                       isSelected
-                        ? 'border-amber-400 ring-2 ring-amber-400 shadow-[0_0_18px_rgba(245,190,50,0.6)] scale-105'
-                        : 'border-[#2d5673] hover:border-sky-400 hover:scale-102'
+                        ? 'border-amber-300 ring-2 ring-amber-400 shadow-[0_0_22px_rgba(245,190,50,0.85)] scale-105'
+                        : fieldMonsters.length >= 2
+                          ? 'border-sky-400/90 shadow-[0_0_12px_rgba(56,189,248,0.35)] hover:border-amber-300 hover:shadow-[0_0_18px_rgba(251,191,36,0.6)]'
+                          : 'border-[#2d5673] hover:border-sky-400 hover:scale-102'
                     }`}
                   >
                     <div className="aspect-[3/4] rounded overflow-hidden bg-black/50 mb-1.5">
@@ -175,7 +177,7 @@ export const ExtraDeckModal: React.FC<ExtraDeckModalProps> = ({
                         className={`p-2 rounded-lg border text-left flex flex-col items-center transition-all ${
                           isPicked
                             ? 'bg-amber-950/70 border-amber-400 ring-2 ring-amber-400 shadow-md scale-105'
-                            : 'bg-[#102538] border-[#294e6b] hover:border-sky-400'
+                            : 'bg-[#102538] border-sky-400/70 shadow-[0_0_10px_rgba(56,189,248,0.25)] hover:border-amber-300 hover:shadow-[0_0_16px_rgba(251,191,36,0.55)]'
                         }`}
                       >
                         <div className="w-14 aspect-[3/4] rounded overflow-hidden mb-1">
