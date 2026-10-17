@@ -66,23 +66,36 @@ export const CPU_OPPONENTS: CpuOpponent[] = [
   {
     id: 'jaden',
     name: 'Jaden Yuki',
-    title: 'Slifer Red & Elemental HERO Specialist',
+    title: 'Slifer Red & HERO Combo Duelist',
     avatar: 'https://images.ygoprodeck.com/images/cards/35809262.jpg',
-    signatureCard: 'Elemental HERO Flame Wingman',
-    difficulty: 'Medium',
-    dialog: 'Get your game on! Let’s have a fun match and summon some awesome fusions!',
+    signatureCard: 'Elemental HERO Sunrise',
+    difficulty: 'Expert',
+    dialog: 'Get your game on! Vision HERO, Destiny HERO, and Elemental HERO—let’s fuse our way to victory!',
     deck: {
       main: [
+        'Elemental HERO Stratos', 'Elemental HERO Stratos',
+        'Elemental HERO Shadow Mist', 'Elemental HERO Shadow Mist',
+        'Elemental HERO Honest Neos', 'Elemental HERO Liquid Soldier',
+        'Vision HERO Faris', 'Vision HERO Faris', 'Vision HERO Faris',
+        'Vision HERO Increase', 'Vision HERO Increase',
+        'Vision HERO Vyon', 'Vision HERO Vyon',
         'Destiny HERO - Malicious', 'Destiny HERO - Malicious',
-        'Honest', 'Kuriboh', 'Exiled Force', 'D.D. Warrior Lady',
-        'Prank-Kids Rocksies', 'Prank-Kids Dropsies',
-        'Marshmallon', 'Breaker the Magical Warrior',
-        'Polymerization', 'Polymerization', 'Monster Reborn', 'Pot of Greed',
-        'Raigeki', 'Dark Hole', 'Mystical Space Typhoon',
-        'Mirror Force', 'Magic Cylinder', 'Bottomless Trap Hole'
+        'Destiny HERO - Denier', 'Destiny HERO - Plasma', 'Destiny HERO - Drawhand',
+        'Destiny HERO - Dynatag', 'Destiny HERO - Celestial',
+        'Ash Blossom & Joyous Spring', 'Ash Blossom & Joyous Spring',
+        'Maxx "C"', 'Maxx "C"', 'Droll & Lock Bird', 'Droll & Lock Bird',
+        'E - Emergency Call', 'E - Emergency Call', 'Reinforcement of the Army',
+        'A Hero Lives', 'D - Force', 'Fusion Destiny',
+        'Mask Change', 'Mask Change', 'Polymerization', 'Miracle Fusion',
+        'Called by the Grave', 'Crossout Designator', 'Raigeki', "Harpie's Feather Duster"
       ],
       extra: [
-        'Elemental HERO Flame Wingman', 'Prank-Kids Rocket Ride', 'Number 39: Utopia'
+        'Elemental HERO Sunrise', 'Elemental HERO Absolute Zero', 'Elemental HERO Escuridao',
+        'Elemental HERO Flame Wingman', 'Destiny HERO - Dystopia', 'Destiny HERO - Dangerous',
+        'Masked HERO Dark Law', 'Masked HERO Dark Law', 'Masked HERO Acid',
+        'Vision HERO Adoration', 'Vision HERO Trinity',
+        'Xtra HERO Cross Crusader', 'Xtra HERO Cross Crusader',
+        'Xtra HERO Wonder Driver', 'Xtra HERO Dread Decimator'
       ]
     }
   },
@@ -108,7 +121,7 @@ export const CPU_OPPONENTS: CpuOpponent[] = [
         'Stardust Dragon', 'Black Rose Dragon', 'Number 39: Utopia', 'Decode Talker'
       ]
     }
-  }
+  },
 
   {
     id: 'kaiser-ryo',

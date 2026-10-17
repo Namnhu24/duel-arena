@@ -733,6 +733,110 @@ export default function App() {
         }
       }
 
+      // Jaden Yuki's HERO AI: prioritize the Faris/Increase/Vyon engine,
+      // load Destiny HERO - Malicious into the GY, then aim for HERO Fusion bosses.
+      const isJadenYuki = /jaden yuki/i.test(ai.name);
+      if (isJadenYuki) {
+        const freeMonsterSlot = () => ai.monsters.findIndex(m => m === null);
+        const specialFromDeck = (name: string) => {
+          const slot = freeMonsterSlot();
+          const idx = ai.deck.findIndex(c => c.name === name);
+          if (slot < 0 || idx < 0) return false;
+          const [card] = ai.deck.splice(idx, 1);
+          card.faceUp = true; card.position = 'ATTACK'; card.placedTurn = newTurn;
+          card.hasAttacked = false; card.summonKind = 'SPECIAL'; ai.monsters[slot] = card;
+          return true;
+        };
+        const normalFromHand = (names: string[]) => {
+          if (freeMonsterSlot() < 0) return false;
+          const idx = ai.hand.findIndex(c => names.includes(c.name) && c.type === 'MONSTER' && (c.level || 4) <= 4);
+          if (idx < 0) return false;
+          const [card] = ai.hand.splice(idx, 1);
+          card.faceUp = true; card.position = 'ATTACK'; card.placedTurn = newTurn;
+          card.hasAttacked = false; card.summonKind = 'NORMAL'; ai.monsters[freeMonsterSlot()] = card;
+          return true;
+        };
+
+        // A Hero Lives is the preferred opener when the field is empty.
+        const aHeroLives = ai.hand.findIndex(c => c.name === 'A Hero Lives');
+        if (aHeroLives >= 0 && ai.monsters.every(m => !m) && ai.lp > 2000) {
+          ai.lp = Math.floor(ai.lp / 2);
+          ai.graveyard.push(ai.hand.splice(aHeroLives, 1)[0]);
+          if (specialFromDeck('Elemental HERO Stratos') || specialFromDeck('Elemental HERO Shadow Mist')) {
+            const summoned = ai.monsters.find(m => m && ['Elemental HERO Stratos', 'Elemental HERO Shadow Mist'].includes(m.name));
+            if (summoned?.name === 'Elemental HERO Stratos') {
+              const target = ai.deck.findIndex(c => ['Vision HERO Faris', 'Vision HERO Vyon', 'Elemental HERO Shadow Mist'].includes(c.name));
+              if (target >= 0) ai.hand.push(ai.deck.splice(target, 1)[0]);
+            }
+          }
+        }
+
+        // Faris converts a spare HERO in hand into an extender and places Increase face-up.
+        const farisIndex = ai.hand.findIndex(c => c.name === 'Vision HERO Faris');
+        const discardHeroIndex = ai.hand.findIndex((c, i) => i !== farisIndex && c.type === 'MONSTER' && /HERO/.test(c.name));
+        if (farisIndex >= 0 && discardHeroIndex >= 0 && freeMonsterSlot() >= 0) {
+          const [discarded] = ai.hand.splice(discardHeroIndex, 1); ai.graveyard.push(discarded);
+          const updatedFarisIndex = ai.hand.findIndex(c => c.name === 'Vision HERO Faris');
+          const [faris] = ai.hand.splice(updatedFarisIndex, 1);
+          faris.faceUp = true; faris.position = 'ATTACK'; faris.placedTurn = newTurn;
+          faris.hasAttacked = false; faris.summonKind = 'SPECIAL'; ai.monsters[freeMonsterSlot()] = faris;
+          const increaseIdx = ai.deck.findIndex(c => c.name === 'Vision HERO Increase');
+          const spellSlot = ai.spells.findIndex(c => c === null);
+          if (increaseIdx >= 0 && spellSlot >= 0) {
+            const [increase] = ai.deck.splice(increaseIdx, 1);
+            increase.faceUp = true; ai.spells[spellSlot] = increase;
+          }
+        }
+
+        // Normal summon a low-level starter instead of wasting the Normal Summon on a high-level HERO.
+        normalFromHand(['Vision HERO Vyon', 'Elemental HERO Stratos', 'Elemental HERO Shadow Mist', 'Elemental HERO Solid Soldier']);
+
+        // Vyon sends Malicious to the GY; Malicious then extends the field from the GY.
+        if (ai.monsters.some(m => m?.name === 'Vision HERO Vyon') && !ai.graveyard.some(c => c.name === 'Destiny HERO - Malicious')) {
+          const maliIdx = ai.deck.findIndex(c => c.name === 'Destiny HERO - Malicious');
+          if (maliIdx >= 0) ai.graveyard.push(ai.deck.splice(maliIdx, 1)[0]);
+        }
+        if (ai.graveyard.some(c => c.name === 'Destiny HERO - Malicious') && freeMonsterSlot() >= 0) {
+          const gyIdx = ai.graveyard.findIndex(c => c.name === 'Destiny HERO - Malicious');
+          const deckIdx = ai.deck.findIndex(c => c.name === 'Destiny HERO - Malicious');
+          if (gyIdx >= 0 && deckIdx >= 0) {
+            ai.banished.push(ai.graveyard.splice(gyIdx, 1)[0]);
+            specialFromDeck('Destiny HERO - Malicious');
+          }
+        }
+
+        // Convert two HERO bodies into Sunrise when Polymerization and the Extra Deck target are available.
+        const polyIdx = ai.hand.findIndex(c => c.name === 'Polymerization');
+        const sunriseIdx = ai.extraDeck.findIndex(c => c.name === 'Elemental HERO Sunrise');
+        const heroField = ai.monsters.map((m, slot) => ({ m, slot })).filter(x => x.m && /HERO/.test(x.m.name));
+        const heroHand = ai.hand.filter(c => c.type === 'MONSTER' && /HERO/.test(c.name));
+        if (polyIdx >= 0 && sunriseIdx >= 0 && heroField.length + heroHand.length >= 2 && freeMonsterSlot() >= 0) {
+          let used = 0;
+          for (const item of heroField) {
+            if (used >= 2) break;
+            if (item.m) { ai.graveyard.push(item.m); ai.monsters[item.slot] = null; used++; }
+          }
+          while (used < 2) {
+            const idx = ai.hand.findIndex(c => c.type === 'MONSTER' && /HERO/.test(c.name));
+            if (idx < 0) break;
+            ai.graveyard.push(ai.hand.splice(idx, 1)[0]); used++;
+          }
+          if (used === 2) {
+            const pidx = ai.hand.findIndex(c => c.name === 'Polymerization');
+            if (pidx >= 0) ai.graveyard.push(ai.hand.splice(pidx, 1)[0]);
+            const fusionIdx = ai.extraDeck.findIndex(c => c.name === 'Elemental HERO Sunrise');
+            if (fusionIdx >= 0) {
+              const [fusion] = ai.extraDeck.splice(fusionIdx, 1);
+              fusion.faceUp = true; fusion.position = 'ATTACK'; fusion.placedTurn = newTurn;
+              fusion.hasAttacked = false; fusion.summonKind = 'FUSION';
+              ai.monsters[freeMonsterSlot()] = fusion;
+              const miracleIdx = ai.deck.findIndex(c => c.name === 'Miracle Fusion');
+              if (miracleIdx >= 0) ai.hand.push(ai.deck.splice(miracleIdx, 1)[0]);
+            }
+          }
+        }
+      }
+
       // Field spell
       const fieldIndex = ai.hand.findIndex(c => c.subtype === 'Field Spell');
       if (fieldIndex >= 0) {
