@@ -17,3 +17,24 @@ export const getSummonRequirement = (card: Pick<CardDefinition, 'extraKind' | 'm
       return null;
   }
 };
+
+
+/** True when the current field/hand has a plausible material set for at least one Extra Deck monster.
+ * Used for the Extra Deck zone indicator; final legality is checked in the summon modal. */
+export const hasPotentialExtraSummon = (extraDeck: CardDefinition[], field: CardDefinition[], hand: CardDefinition[] = []): boolean => {
+  const faceUpField = field;
+  return extraDeck.some(extra => {
+    const pool = extra.extraKind === 'FUSION' ? [...faceUpField, ...hand] : faceUpField;
+    if (extra.extraKind === 'FUSION') {
+      const n = extra.name.toLowerCase();
+      if (n.includes('blue-eyes ultimate')) return pool.filter(m => m.name === 'Blue-Eyes White Dragon').length >= 3;
+      if (n.includes('flame wingman')) return pool.some(m => /Avian/i.test(m.name)) && pool.some(m => /Burstinatrix/i.test(m.name));
+      if (n.includes('rocket ride') || n.includes('weather washer')) return pool.filter(m => m.name.startsWith('Prank-Kids')).length >= 2;
+      return pool.length >= 2;
+    }
+    if (extra.extraKind === 'SYNCHRO') return pool.some(m => m.tuner) && pool.some(m => !m.tuner) && pool.reduce((n, m) => n + (m.level || 0), 0) >= (extra.level || 0);
+    if (extra.extraKind === 'XYZ') return pool.filter(m => (m.level || 0) === (extra.level || 4)).length >= 2;
+    if (extra.extraKind === 'LINK') return pool.filter(m => m.subtype !== 'Normal').length >= (extra.linkRating || 2);
+    return false;
+  });
+};

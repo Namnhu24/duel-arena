@@ -837,6 +837,36 @@ export default function App() {
         }
       }
 
+      // CPU uses common Normal/Continuous Spells instead of holding every Spell forever.
+      const usableSpellIdx = ai.hand.findIndex(c => c.type === 'SPELL' && c.subtype !== 'Field Spell'
+        && !['Polymerization', 'Cyber Revsystem', 'Dark Calling', 'Miracle Fusion'].includes(c.name));
+      if (usableSpellIdx >= 0) {
+        const spellCard = ai.hand[usableSpellIdx];
+        const spellName = spellCard.name.toLowerCase();
+        let activated = false;
+        if (spellName.includes('raigeki') || spellName.includes('dark hole')) {
+          player.monsters.forEach((m, i) => { if (m) { player.graveyard.push(m); player.monsters[i] = null; } });
+          activated = true;
+        } else if (spellName.includes('mystical space typhoon') || spellName.includes('cosmic cyclone')) {
+          const target = player.spells.findIndex(Boolean);
+          if (target >= 0) { player.graveyard.push(player.spells[target]!); player.spells[target] = null; activated = true; }
+        } else if (spellName.includes('monster reborn') || spellName.includes('call of the haunted')) {
+          const slot = ai.monsters.findIndex(m => m === null);
+          const target = ai.graveyard.findIndex(c => c.type === 'MONSTER' && !c.extraKind);
+          if (slot >= 0 && target >= 0) {
+            const [revived] = ai.graveyard.splice(target, 1);
+            revived.faceUp = true; revived.position = 'ATTACK'; revived.placedTurn = newTurn; revived.hasAttacked = false;
+            revived.summonKind = 'SPECIAL'; ai.monsters[slot] = revived; activated = true;
+          }
+        } else if (spellCard.activateEffect) {
+          try {
+            spellCard.activateEffect({ card: spellCard, owner: ai, opponent: player, ownerSide: 'ai', gameState: prev, log: addLog });
+            activated = true;
+          } catch { /* unsupported CPU spell effect: leave it in hand */ }
+        }
+        if (activated) { ai.graveyard.push(ai.hand.splice(usableSpellIdx, 1)[0]); addLog(`${ai.name} activated [${spellCard.name}]!`); sound.playEffectChime(); }
+      }
+
       // Field spell
       const fieldIndex = ai.hand.findIndex(c => c.subtype === 'Field Spell');
       if (fieldIndex >= 0) {
@@ -892,6 +922,45 @@ export default function App() {
         trapCard.setTurn = newTurn;
         ai.spells[emptySpell] = trapCard;
       }
+
+      // Generic CPU Extra Deck lines: Synchro, Xyz, Link and Fusion when material checks pass.
+      const extraSlot = ai.monsters.findIndex(m => m === null);
+      if (extraSlot >= 0) {
+        const field = ai.monsters.filter((m): m is CardInstance => m !== null && m.faceUp);
+        const extraIndex = ai.extraDeck.findIndex(extra => {
+          if (extra.extraKind === 'XYZ') return field.filter(m => (m.level || 0) === (extra.level || 4)).length >= 2;
+          if (extra.extraKind === 'SYNCHRO') {
+            const tuners = field.filter(m => m.tuner);
+            return tuners.some(t => field.some(n => !n.tuner && n.uid !== t.uid && (t.level || 0) + (n.level || 0) === (extra.level || 0)));
+          }
+          if (extra.extraKind === 'LINK') return field.filter(m => m.subtype !== 'Normal').length >= (extra.linkRating || 2);
+          if (extra.extraKind === 'FUSION') return field.length >= 2 && (ai.hand.some(c => c.name === 'Polymerization') || /Cyber|HERO|Prank-Kids/i.test(ai.name));
+          return false;
+        });
+        if (extraIndex >= 0) {
+          const extra = ai.extraDeck[extraIndex];
+          let materials: CardInstance[] = [];
+          if (extra.extraKind === 'XYZ') materials = field.filter(m => (m.level || 0) === (extra.level || 4)).slice(0, 2);
+          else if (extra.extraKind === 'SYNCHRO') {
+            const tuner = field.find(m => m.tuner && field.some(n => !n.tuner && n.uid !== m.uid && (m.level || 0) + (n.level || 0) === (extra.level || 0)));
+            const nonTuner = tuner && field.find(n => !n.tuner && n.uid !== tuner.uid && (n.level || 0) + (tuner.level || 0) === (extra.level || 0));
+            if (tuner && nonTuner) materials = [tuner, nonTuner];
+          } else if (extra.extraKind === 'LINK') materials = field.filter(m => m.subtype !== 'Normal').slice(0, extra.linkRating || 2);
+          else if (extra.extraKind === 'FUSION') materials = field.slice(0, 2);
+          if (materials.length >= 1 && (extra.extraKind !== 'SYNCHRO' || materials.length >= 2)) {
+            materials.forEach(mat => { const idx = ai.monsters.findIndex(m => m?.uid === mat.uid); if (idx >= 0) { ai.monsters[idx] = null; if (extra.extraKind === 'XYZ') extra.materials.push(mat); else ai.graveyard.push(mat); } });
+            const [boss] = ai.extraDeck.splice(extraIndex, 1);
+            boss.faceUp = true; boss.position = 'ATTACK'; boss.placedTurn = newTurn; boss.hasAttacked = false; boss.summonKind = extra.extraKind;
+            const free = ai.monsters.findIndex(m => m === null);
+            if (free >= 0) ai.monsters[free] = boss;
+            addLog(`${ai.name} performed a ${extra.extraKind} Summon: [${boss.name}]!`);
+            sound.playSpecialSummon();
+          }
+        }
+      }
+
+      // Activate a set Mirror Force when the player attacks: trap cards are part of the CPU strategy.
+      // (Other set traps remain available for their specific supported triggers.)
 
       // Attack. Having no monster to attack with never causes an LP penalty by itself.
       let attackAnim = null;
@@ -1035,7 +1104,7 @@ export default function App() {
 
     const isP1 = state.activeSide === 'player';
     const activePlayer = isP1 ? state.player : state.ai;
-    const tributesRequired = getRequiredTributes(card.level || 1);
+    const tributesRequired = getRequiredTributes(Number(card.level ?? 1));
     const availableMonsters = activePlayer.monsters.filter((m): m is CardInstance => m !== null);
 
     if (tributesRequired > 0) {
@@ -1063,7 +1132,7 @@ export default function App() {
     }
     const isP1 = state.activeSide === 'player';
     const activePlayer = isP1 ? state.player : state.ai;
-    const requiredTributes = getRequiredTributes(card.level || 1);
+    const requiredTributes = getRequiredTributes(Number(card.level ?? 1));
     if (tributeUids.length !== requiredTributes) {
       addLog(`You must select exactly ${requiredTributes} Tribute(s) for ${card.name}.`);
       return;
@@ -1344,45 +1413,66 @@ export default function App() {
     }
   };
 
-  // Extra Deck Summon
+  // Extra Deck Summon: validate and consume materials before checking for a free zone.
+  // This is important when the field is full: using field monsters as materials frees zones.
   const handleSummonExtraMonster = (extraCard: CardInstance, materialUids: number[]) => {
     const isP1 = state.activeSide === 'player';
+    if (!extraCard.extraKind || materialUids.length === 0 || new Set(materialUids).size !== materialUids.length) {
+      addLog('Choose valid materials before confirming the Extra Deck Summon.');
+      return;
+    }
+    let succeeded = false;
     setState(prev => {
-      const curP = isP1 ? { ...prev.player } : { ...prev.ai };
+      const curP = isP1
+        ? { ...prev.player, hand: [...prev.player.hand], extraDeck: [...prev.player.extraDeck], monsters: [...prev.player.monsters], graveyard: [...prev.player.graveyard] }
+        : { ...prev.ai, hand: [...prev.ai.hand], extraDeck: [...prev.ai.extraDeck], monsters: [...prev.ai.monsters], graveyard: [...prev.ai.graveyard] };
       const extraIdx = curP.extraDeck.findIndex(c => c.uid === extraCard.uid);
       if (extraIdx < 0) return prev;
+
+      const fieldMaterials = materialUids.map(uid => curP.monsters.find(m => m?.uid === uid && m.faceUp)).filter((m): m is CardInstance => Boolean(m));
+      const handMaterials = materialUids.map(uid => curP.hand.find(m => m.uid === uid && m.type === 'MONSTER')).filter((m): m is CardInstance => Boolean(m));
+      const resolvedMaterials = materialUids.map(uid => fieldMaterials.find(m => m.uid === uid) || (extraCard.extraKind === 'FUSION' ? handMaterials.find(m => m.uid === uid) : undefined));
+      if (resolvedMaterials.some(m => !m) || resolvedMaterials.length !== materialUids.length) {
+        addLog('Some selected materials are no longer available. Please select them again.');
+        return prev;
+      }
+
+      // Remove the selected materials first so they can free space on a full field.
+      for (const uid of materialUids) {
+        const mIdx = curP.monsters.findIndex(m => m?.uid === uid);
+        if (mIdx >= 0) {
+          const mat = curP.monsters[mIdx]!;
+          curP.monsters[mIdx] = null;
+          if (extraCard.extraKind === 'XYZ') {
+            // Keep the Xyz materials attached to the summoned monster below.
+          } else {
+            curP.graveyard.push(mat);
+          }
+        } else {
+          const hIdx = curP.hand.findIndex(h => h.uid === uid);
+          if (hIdx >= 0 && extraCard.extraKind === 'FUSION') curP.graveyard.push(curP.hand.splice(hIdx, 1)[0]);
+        }
+      }
+
+      const emptySlot = curP.monsters.findIndex(m => m === null);
+      const emz = prev.extraMonsterZone.findIndex(m => m === null);
+      if (emptySlot < 0 && emz < 0) {
+        addLog('No available Monster Zone or Extra Monster Zone after using the selected materials.');
+        return prev;
+      }
 
       const [summoned] = curP.extraDeck.splice(extraIdx, 1);
       summoned.faceUp = true;
       summoned.position = 'ATTACK';
       summoned.hasAttacked = false;
       summoned.placedTurn = prev.turn;
-
-      materialUids.forEach(uid => {
-        const mIdx = curP.monsters.findIndex(m => m && m.uid === uid);
-        if (mIdx >= 0) {
-          const mat = curP.monsters[mIdx]!;
-          curP.monsters[mIdx] = null;
-          if (extraCard.extraKind === 'XYZ') {
-            summoned.materials.push(mat);
-          } else {
-            curP.graveyard.push(mat);
-          }
-        }
-        const hIdx = curP.hand.findIndex(h => h.uid === uid);
-        if (hIdx >= 0) {
-          const mat = curP.hand.splice(hIdx, 1)[0];
-          curP.graveyard.push(mat);
-        }
-      });
-
-      const emptySlot = curP.monsters.findIndex(m => m === null);
-      if (emptySlot >= 0) {
-        curP.monsters[emptySlot] = summoned;
-      } else {
-        prev.extraMonsterZone[0] = summoned;
+      if (extraCard.extraKind === 'XYZ') {
+        resolvedMaterials.forEach(mat => { if (mat) summoned.materials.push(mat); });
       }
+      if (emptySlot >= 0) curP.monsters[emptySlot] = summoned;
 
+      const nextExtraZones = [...prev.extraMonsterZone];
+      if (emptySlot < 0 && emz >= 0) nextExtraZones[emz] = summoned;
       if (isOnlineMatch) {
         multiplayer.syncAction('SUMMON', {
           cardName: extraCard.name,
@@ -1391,13 +1481,15 @@ export default function App() {
           position: 'ATTACK',
         });
       }
-
+      succeeded = true;
       return {
         ...prev,
         player: isP1 ? curP : prev.player,
         ai: isP1 ? prev.ai : curP,
+        extraMonsterZone: nextExtraZones,
       };
     });
+    // State updates are queued; modal validates the selection before calling this handler.
     addLog(`SPECIAL SUMMON! [${extraCard.name}] (${extraCard.extraKind}) descends onto the field!`);
   };
 
@@ -1409,6 +1501,27 @@ export default function App() {
 
     const attacker = attackingPlayer.monsters.find(m => m && m.uid === attackerUid);
     if (!attacker) return;
+
+    // CPU Trap response: a previously Set Mirror Force activates when the player declares an attack.
+    if (isP1) {
+      const mirrorForceIdx = state.ai.spells.findIndex(c => c && !c.faceUp && /mirror force/i.test(c.name));
+      if (mirrorForceIdx >= 0) {
+        setState(prev => {
+          const ai = { ...prev.ai, spells: [...prev.ai.spells], monsters: [...prev.ai.monsters], graveyard: [...prev.ai.graveyard] };
+          const trap = ai.spells[mirrorForceIdx];
+          if (!trap || trap.faceUp) return prev;
+          ai.spells[mirrorForceIdx] = null;
+          ai.graveyard.push(trap);
+          ai.monsters.forEach((m, idx) => {
+            if (m && m.position === 'ATTACK') { ai.graveyard.push(m); ai.monsters[idx] = null; }
+          });
+          return { ...prev, ai };
+        });
+        addLog(`${state.ai.name} activated [Mirror Force]! Your attack-position monsters were destroyed.`);
+        sound.playEffectChime();
+        return;
+      }
+    }
 
     sound.playAttack();
 
@@ -1990,6 +2103,7 @@ export default function App() {
       />
 
       <TributeModal
+        key={tributeState?.card.uid ?? 'no-tribute'}
         cardToSummon={tributeState?.card || null}
         mode={tributeState?.mode || 'SUMMON'}
         requiredCount={tributeState?.requiredCount || 1}

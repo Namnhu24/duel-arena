@@ -29,41 +29,61 @@ export const ExtraDeckModal: React.FC<ExtraDeckModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Available candidate materials from field (and hand if fusion)
+  // Fusion materials may come from hand or field; Synchro/Xyz/Link use face-up field monsters.
   const fieldMonsters = player.monsters.filter((m): m is CardInstance => m !== null && m.faceUp);
   const handMonsters = player.hand.filter((m) => m.type === 'MONSTER');
-  const candidateMaterials = selectedExtraCard?.extraKind === 'FUSION' 
+  const candidateMaterials = selectedExtraCard?.extraKind === 'FUSION'
     ? [...fieldMonsters, ...handMonsters]
     : fieldMonsters;
 
-  // Check material validity
   const checkCanSummon = (extra: CardInstance, materials: CardInstance[]) => {
+    if (!extra.extraKind || materials.length === 0 || new Set(materials.map(m => m.uid)).size !== materials.length) return false;
     if (extra.extraKind === 'SYNCHRO') {
-      const hasTuner = materials.some(m => m.tuner);
-      const hasNonTuner = materials.some(m => !m.tuner);
-      const totalLevel = materials.reduce((sum, m) => sum + (m.level || 0), 0);
-      return materials.length >= 2 && hasTuner && hasNonTuner && totalLevel === extra.level;
+      return materials.length >= 2 && materials.some(m => m.tuner) && materials.some(m => !m.tuner)
+        && materials.reduce((sum, m) => sum + (m.level || 0), 0) === (extra.level || 0);
     }
     if (extra.extraKind === 'XYZ') {
-      return materials.length === 2 && materials.every(m => m.level === 4);
+      const rank = extra.level || 4;
+      return materials.length === 2 && materials.every(m => (m.level || 0) === rank);
     }
     if (extra.extraKind === 'LINK') {
-      return materials.length === 3 && materials.every(m => m.subtype !== 'Normal');
+      const rating = extra.linkRating || 2;
+      const effectMonsters = materials.every(m => m.subtype !== 'Normal');
+      // Simplified Link material accounting: each material contributes its Link Rating, or 1 if not Link.
+      const ratingTotal = materials.reduce((sum, m) => sum + (m.extraKind === 'LINK' ? (m.linkRating || 1) : 1), 0);
+      return effectMonsters && materials.length >= 1 && materials.length <= rating && ratingTotal === rating;
     }
     if (extra.extraKind === 'FUSION') {
-      if (extra.name.includes('Blue-Eyes Ultimate Dragon')) {
+      const name = extra.name.toLowerCase();
+      if (name.includes('blue-eyes ultimate dragon') || name.includes('neo blue-eyes ultimate dragon'))
         return materials.length === 3 && materials.every(m => m.name === 'Blue-Eyes White Dragon');
-      }
-      if (extra.name.includes('Flame Wingman')) {
-        const hasAvian = materials.some(m => m.name.includes('Avian') || m.name.includes('Elemental HERO'));
-        const hasBurst = materials.some(m => m.name.includes('Burstinatrix') || m.name.includes('Sparkman'));
-        return materials.length === 2 && (hasAvian || hasBurst);
-      }
-      if (extra.name.includes('Rocket Ride')) {
+      if (name.includes('flame wingman'))
+        return materials.length === 2 && materials.some(m => /Avian/i.test(m.name)) && materials.some(m => /Burstinatrix/i.test(m.name));
+      if (name.includes('rocket ride'))
         return materials.length === 2 && materials.every(m => m.name.startsWith('Prank-Kids'));
-      }
+      if (name.includes('weather washer'))
+        return materials.length === 2 && materials.every(m => m.name.startsWith('Prank-Kids'));
+      if (name.includes('cyber twin dragon'))
+        return materials.length === 2 && materials.every(m => /Cyber Dragon/i.test(m.name));
+      if (name.includes('cyber end dragon'))
+        return materials.length === 3 && materials.every(m => /Cyber Dragon/i.test(m.name));
+      if (name.includes('chimeratech fortress dragon'))
+        return materials.length >= 2 && materials.every(m => /Cyber Dragon|Machine/i.test(m.name) || m.race === 'Machine');
+      if (name.includes('chimeratech megafleet dragon'))
+        return materials.length >= 2 && materials.some(m => /Cyber Dragon/i.test(m.name));
+      if (name.includes('elemental hero bubbleman')) return materials.length === 2 && materials.some(m => /Bubbleman/i.test(m.name));
+      // The database does not encode exact requirements for every Fusion card; use the common two-material rule.
       return materials.length >= 2;
     }
+    return false;
+  };
+
+  const couldSummon = (extra: CardInstance) => {
+    const pool = extra.extraKind === 'FUSION' ? [...fieldMonsters, ...handMonsters] : fieldMonsters;
+    if (extra.extraKind === 'SYNCHRO') return pool.some(m => m.tuner) && pool.some(m => !m.tuner) && pool.reduce((n, m) => n + (m.level || 0), 0) >= (extra.level || 0);
+    if (extra.extraKind === 'XYZ') return pool.filter(m => (m.level || 0) === (extra.level || 4)).length >= 2;
+    if (extra.extraKind === 'LINK') return pool.filter(m => m.subtype !== 'Normal').length >= (extra.linkRating || 2);
+    if (extra.extraKind === 'FUSION') return pool.length >= 2;
     return false;
   };
 
@@ -131,8 +151,8 @@ export const ExtraDeckModal: React.FC<ExtraDeckModalProps> = ({
                     className={`cursor-pointer rounded-xl overflow-hidden border p-2 bg-[#0e2133] transition-all ${
                       isSelected
                         ? 'border-amber-300 ring-2 ring-amber-400 shadow-[0_0_22px_rgba(245,190,50,0.85)] scale-105'
-                        : fieldMonsters.length >= 2
-                          ? 'border-sky-400/90 shadow-[0_0_12px_rgba(56,189,248,0.35)] hover:border-amber-300 hover:shadow-[0_0_18px_rgba(251,191,36,0.6)]'
+                        : couldSummon(card)
+                          ? 'border-emerald-300 shadow-[0_0_18px_rgba(52,211,153,0.75)] animate-pulse hover:border-amber-300 hover:shadow-[0_0_22px_rgba(251,191,36,0.75)]'
                           : 'border-[#2d5673] hover:border-sky-400 hover:scale-102'
                     }`}
                   >
@@ -142,7 +162,7 @@ export const ExtraDeckModal: React.FC<ExtraDeckModalProps> = ({
                     <div className="text-center">
                       <p className="font-['Cinzel'] font-bold text-[11px] text-stone-100 truncate">{card.name}</p>
                       <span className="text-[10px] font-['Orbitron'] font-bold text-amber-300">
-                        {card.extraKind}
+                        {card.extraKind}{couldSummon(card) ? ' · READY' : ''}
                       </span>
                     </div>
                   </div>

@@ -6,7 +6,7 @@
  * - Level 9+: 3 Tributes
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { CardInstance } from '../types/duel';
 import { Shield, Skull, X, CheckCircle2 } from 'lucide-react';
 import { sound } from '../utils/audio';
@@ -29,6 +29,8 @@ export const TributeModal: React.FC<TributeModalProps> = ({
   onCancel,
 }) => {
   const [selectedUids, setSelectedUids] = useState<number[]>([]);
+
+  useEffect(() => { setSelectedUids([]); }, [cardToSummon?.uid, requiredCount, mode]);
 
   if (!cardToSummon) return null;
 
@@ -82,8 +84,10 @@ export const TributeModal: React.FC<TributeModalProps> = ({
               {availableMonsters.map(m => {
                 const isSelected = selectedUids.includes(m.uid);
                 return (
-                  <div
+                  <button
+                    type="button"
                     key={m.uid}
+                    aria-pressed={isSelected}
                     onClick={() => toggleMonster(m.uid)}
                     className={`cursor-pointer rounded-xl border p-2 flex flex-col items-center transition-all ${
                       isSelected
@@ -109,7 +113,7 @@ export const TributeModal: React.FC<TributeModalProps> = ({
                     <span className="text-[9px] text-stone-400">
                       {m.faceUp ? `ATK ${m.atk} · Lv.${m.level}` : 'Defense Position'}
                     </span>
-                  </div>
+                  </button>
                 );
               })}
             </div>

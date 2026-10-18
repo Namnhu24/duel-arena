@@ -7,6 +7,7 @@ import React from 'react';
 import { CardInstance, DuelState } from '../types/duel';
 import { CenterPhaseController } from './CenterPhaseController';
 import { Target, Sparkles, Zap, Shield, Swords, Layers, Skull } from 'lucide-react';
+import { hasPotentialExtraSummon } from '../utils/summonRequirements';
 
 interface BattlefieldOverlayProps {
   state: DuelState;
@@ -365,7 +366,7 @@ export const BattlefieldOverlay: React.FC<BattlefieldOverlayProps> = ({
         {/* Player Spell & Trap Zones (5 Zones) */}
         <div className="flex items-center justify-center gap-2 md:gap-3.5 w-full max-w-4xl">
           {/* Player Extra Deck Plinth */}
-          <div className={`w-[62px] h-[90px] md:w-[72px] md:h-[105px] rounded-lg border bg-[#241a0d]/60 flex flex-col items-center justify-center text-center transition-all ${state.player.extraDeck.length > 0 && state.player.monsters.filter(Boolean).length >= 2 ? 'border-amber-300 ring-2 ring-amber-400 shadow-[0_0_22px_rgba(251,191,36,.85)] animate-pulse' : 'border-amber-500/60'}`}>
+          <div className={`w-[62px] h-[90px] md:w-[72px] md:h-[105px] rounded-lg border bg-[#241a0d]/60 flex flex-col items-center justify-center text-center transition-all ${state.player.extraDeck.length > 0 && hasPotentialExtraSummon(state.player.extraDeck, state.player.monsters.filter((m): m is CardInstance => m !== null && m.faceUp), state.player.hand.filter(c => c.type === 'MONSTER')) ? 'border-emerald-300 ring-2 ring-emerald-400 shadow-[0_0_24px_rgba(52,211,153,.95)] animate-pulse' : 'border-amber-500/60'}`}>
             <Layers className="w-4 h-4 text-amber-400 mb-1" />
             <span className="text-[9px] font-['Orbitron'] text-amber-300 font-bold">EXTRA</span>
             <span className="text-xs font-['Orbitron'] text-white font-extrabold">{state.player.extraDeck.length}</span>
