@@ -155,7 +155,8 @@ export default function App() {
   const [actionList, setActionList] = useState<CardActionItem[]>([]);
   const [pendingSummonChoice, setPendingSummonChoice] = useState<CardInstance | null>(null);
   const [isMuted, setIsMuted] = useState(false);
-  const [pendingSelection, setPendingSelection] = useState<{ title: string; description: string; candidates: { card: CardInstance; source: 'hand' | 'deck' | 'playerGY' | 'aiGY' | 'field' }[]; effect: 'DROPSIES' | 'REBORN' | 'HONEST_NEOS' | 'ROCKSIES_BANISH' } | null>(null);
+  const [pendingSelection, setPendingSelection] = useState<{ title: string; description: string; candidates: { card: CardInstance; source: 'hand' | 'deck' | 'playerGY' | 'aiGY' | 'field' }[]; effect: 'DROPSIES' | 'REBORN' | 'HONEST_NEOS' | 'ROCKSIES_BANISH' | 'DISCARD_FOR_FARIS' | 'DISCARD_FOR_APPRENTICE' } | null>(null);
+  const [pendingTrapPrompt, setPendingTrapPrompt] = useState<{ trapUid: number; attackerUid: number; targetUid: number | null; trapName: string } | null>(null);
 
   // Tribute Selection Modal State
   const [tributeState, setTributeState] = useState<{
@@ -273,26 +274,28 @@ export default function App() {
   // Continuous Field Spell bonuses. Recalculate both ATK and DEF from printed values
   // so removing/changing a Field Spell never leaves stale bonuses behind.
   useEffect(() => {
-    const activeSpell = state.player.fieldSpell || state.ai.fieldSpell;
+    const activeSpells = [state.player.fieldSpell, state.ai.fieldSpell].filter((c): c is CardInstance => !!c && c.faceUp);
     setState(prev => {
       const applyField = (p: PlayerState): PlayerState => ({
         ...p,
         monsters: p.monsters.map(m => {
           if (!m) return null;
           let bonus = 0;
-          // These classic Field Spells grant the same bonus to ATK and DEF.
-          if (activeSpell?.name === 'Mountain' && ['Dragon', 'Winged Beast', 'Thunder'].includes(m.race || '')) bonus = 200;
-          else if (activeSpell?.name === 'Yami') {
-            if (['Spellcaster', 'Fiend'].includes(m.race || '')) bonus = 200;
-            else if (m.race === 'Fairy') bonus = -200;
-          } else if (activeSpell?.name === 'Necrovalley' && m.name.includes('Gravekeeper')) bonus = 500;
-          // Dragon Ravine and Prank-Kids Place do not grant a blanket ATK/DEF bonus.
+          const race = (m.race || '').toLowerCase();
+          for (const spell of activeSpells) {
+            if (spell.name === 'Mountain' && ['dragon', 'winged beast', 'thunder'].includes(race)) bonus += 200;
+            else if (spell.name === 'Yami') {
+              if (['spellcaster', 'fiend'].includes(race)) bonus += 200;
+              else if (race === 'fairy') bonus -= 200;
+            } else if (spell.name === 'Necrovalley' && m.name.toLowerCase().includes('gravekeeper')) bonus += 500;
+            else if (spell.name === 'Divine Temple of the Snake-Eye' && (m.attribute || '').toUpperCase() === 'FIRE' && (m.level || 0) === 1) bonus += 1100;
+          }
           return { ...m, attackBonus: bonus, defenseBonus: bonus };
         }),
       });
       const newPlayer = applyField(prev.player);
       const newAi = applyField(prev.ai);
-      return { ...prev, activeFieldSpellEffect: activeSpell?.name || null, player: newPlayer, ai: newAi };
+      return { ...prev, activeFieldSpellEffect: activeSpells.map(c => c.name).join(' + ') || null, player: newPlayer, ai: newAi };
     });
   }, [state.player.fieldSpell, state.ai.fieldSpell]);
 
@@ -1336,6 +1339,18 @@ export default function App() {
       setPendingSelection({ title: 'HONEST NEOS', description: 'Choose your HERO monster to gain 2500 ATK until the end of this turn.', candidates, effect: 'HONEST_NEOS' });
       return;
     }
+    if (card.name === 'Vision HERO Faris') {
+      const candidates = owner.hand.filter(c => c.uid !== card.uid && c.type === 'MONSTER' && c.name.includes('HERO')).map(card => ({ card, source: 'hand' as const }));
+      if (!candidates.length) { addLog('[Vision HERO Faris] Choose another HERO monster in your hand to discard.'); return; }
+      setPendingSelection({ title: 'VISION HERO FARIS — DISCARD', description: 'Choose the HERO monster to discard, then Faris will Special Summon itself.', candidates, effect: 'DISCARD_FOR_FARIS' });
+      return;
+    }
+    if (card.name === 'Apprentice Illusion Magician') {
+      const candidates = owner.hand.filter(c => c.uid !== card.uid).map(card => ({ card, source: 'hand' as const }));
+      if (!candidates.length) { addLog('[Apprentice Illusion Magician] You need another card in your hand to discard.'); return; }
+      setPendingSelection({ title: 'APPRENTICE ILLUSION MAGICIAN — DISCARD', description: 'Choose the card to discard to Special Summon this monster.', candidates, effect: 'DISCARD_FOR_APPRENTICE' });
+      return;
+    }
     card.handEffect?.({ card, owner, opponent, ownerSide: 'player', gameState: state, log: addLog });
     setState(prev => ({ ...prev, player: { ...prev.player, hand: [...prev.player.hand], graveyard: [...prev.player.graveyard] }, ai: { ...prev.ai, monsters: [...prev.ai.monsters] } }));
   };
@@ -1494,13 +1509,23 @@ export default function App() {
   };
 
   // Combat Execution (Targeted Monster or Direct Attack)
-  const executeAttack = (attackerUid: number, targetUid: number | null) => {
+  const executeAttack = (attackerUid: number, targetUid: number | null, skipTrapUid: number | null = null) => {
     const isP1 = state.activeSide === 'player';
     const attackingPlayer = isP1 ? state.player : state.ai;
     const defendingPlayer = isP1 ? state.ai : state.player;
 
     const attacker = attackingPlayer.monsters.find(m => m && m.uid === attackerUid);
     if (!attacker) return;
+
+    // Ask the human player before activating a previously Set attack-response Trap.
+    if (!isP1) {
+      const trap = state.player.spells.find(c => c && c.uid !== skipTrapUid && !c.faceUp && c.setTurn !== state.turn &&
+        (/Mirror Force|Magic Cylinder|Dimensional Prison/i.test(c.name)));
+      if (trap) {
+        setPendingTrapPrompt({ trapUid: trap.uid, attackerUid, targetUid, trapName: trap.name });
+        return;
+      }
+    }
 
     // CPU Trap response: a previously Set Mirror Force activates when the player declares an attack.
     if (isP1) {
@@ -1657,6 +1682,45 @@ export default function App() {
       });
       addLog(`DIRECT ATTACK! [${attacker.name}] struck ${defendingPlayer.name} directly for ${totalAtk} damage!`);
     }
+  };
+
+  const resolveTrapPrompt = (activate: boolean) => {
+    const prompt = pendingTrapPrompt;
+    if (!prompt) return;
+    setPendingTrapPrompt(null);
+    if (!activate) {
+      addLog(`You chose not to activate [${prompt.trapName}]. The attack continues.`);
+      // Re-enter combat while temporarily excluding the declined Trap from the prompt search.
+      executeAttack(prompt.attackerUid, prompt.targetUid, prompt.trapUid);
+      return;
+    }
+    const trapIndex = state.player.spells.findIndex(c => c?.uid === prompt.trapUid);
+    const trap = trapIndex >= 0 ? state.player.spells[trapIndex] : null;
+    if (!trap) return;
+    setState(prev => {
+      const player = { ...prev.player, spells: [...prev.player.spells], graveyard: [...prev.player.graveyard], monsters: [...prev.player.monsters] };
+      const idx = player.spells.findIndex(c => c?.uid === prompt.trapUid);
+      if (idx >= 0) { const [used] = player.spells.splice(idx, 1); if (used) player.graveyard.push({ ...used, faceUp: true }); }
+      if (prompt.trapName === 'Mirror Force') {
+        const ai = { ...prev.ai, monsters: [...prev.ai.monsters], graveyard: [...prev.ai.graveyard] };
+        ai.monsters.forEach((m, i) => { if (m && m.position === 'ATTACK') { ai.graveyard.push(m); ai.monsters[i] = null; } });
+        return { ...prev, player, ai, selectedAttackerUid: null };
+      }
+      if (prompt.trapName === 'Dimensional Prison') {
+        const ai = { ...prev.ai, monsters: [...prev.ai.monsters], graveyard: [...prev.ai.graveyard], banished: [...(prev.ai.banished || [])] };
+        const idx = ai.monsters.findIndex(m => m?.uid === prompt.attackerUid);
+        if (idx >= 0) { const [removed] = ai.monsters.splice(idx, 1); if (removed) ai.banished.push(removed); }
+        return { ...prev, player, ai, selectedAttackerUid: null };
+      }
+      return { ...prev, player, selectedAttackerUid: null };
+    });
+    if (prompt.trapName === 'Magic Cylinder') {
+      const attacker = state.ai.monsters.find(m => m?.uid === prompt.attackerUid);
+      const damage = attacker ? (attacker.atk || 0) + (attacker.attackBonus || 0) : 0;
+      setState(prev => ({ ...prev, ai: { ...prev.ai, lp: Math.max(0, prev.ai.lp - damage) } }));
+      addLog(`[Magic Cylinder] negated the attack and reflected ${damage} damage!`);
+    } else addLog(`[${prompt.trapName}] activated! The attack was stopped.`);
+    sound.playEffectChime();
   };
 
   // Card click interaction
@@ -2117,6 +2181,19 @@ export default function App() {
         onCancel={() => setTributeState(null)}
       />
 
+      {pendingTrapPrompt && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-rose-400/70 bg-[#081525] p-6 shadow-[0_0_50px_rgba(244,63,94,.25)]">
+            <h2 className="font-['Orbitron'] text-rose-200 font-black tracking-widest">TRAP ACTIVATION</h2>
+            <p className="text-slate-200 mt-3">CPU đang tấn công. Bạn có muốn kích hoạt <strong>[{pendingTrapPrompt.trapName}]</strong> đã úp không?</p>
+            <div className="flex gap-3 mt-5">
+              <button onClick={() => resolveTrapPrompt(true)} className="flex-1 rounded-lg bg-rose-600 hover:bg-rose-500 px-4 py-3 font-bold text-white">Activate Trap</button>
+              <button onClick={() => resolveTrapPrompt(false)} className="flex-1 rounded-lg bg-slate-700 hover:bg-slate-600 px-4 py-3 font-bold text-white">No, continue</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {pendingSelection && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="w-full max-w-4xl max-h-[85vh] overflow-hidden rounded-2xl border border-amber-400/70 bg-[#081525] shadow-[0_0_50px_rgba(245,158,11,.2)]">
@@ -2128,7 +2205,34 @@ export default function App() {
               {pendingSelection.candidates.map((candidate, idx) => (
                 <button key={`${candidate.card.uid}-${candidate.source}-${idx}`} onClick={() => {
                   const choice = candidate;
-                  if (pendingSelection.effect === 'HONEST_NEOS') {
+                  if (pendingSelection.effect === 'DISCARD_FOR_FARIS' || pendingSelection.effect === 'DISCARD_FOR_APPRENTICE') {
+                    const isFaris = pendingSelection.effect === 'DISCARD_FOR_FARIS';
+                    const summonName = isFaris ? 'Vision HERO Faris' : 'Apprentice Illusion Magician';
+                    const hand = state.player.hand;
+                    const summonIndex = hand.findIndex(c => c.name === summonName);
+                    const empty = state.player.monsters.findIndex(m => m === null);
+                    if (summonIndex < 0 || empty < 0 || !hand.some(c => c.uid === choice.card.uid)) {
+                      addLog(`[${summonName}] Cannot complete the discard summon: check your hand and Monster Zones.`);
+                      setPendingSelection(null); return;
+                    }
+                    setState(prev => {
+                      const player = { ...prev.player, hand: [...prev.player.hand], graveyard: [...prev.player.graveyard], monsters: [...prev.player.monsters], spells: [...prev.player.spells] };
+                      const discardIndex = player.hand.findIndex(c => c.uid === choice.card.uid);
+                      if (discardIndex >= 0) player.graveyard.push(player.hand.splice(discardIndex, 1)[0]);
+                      const selfIndex = player.hand.findIndex(c => c.name === summonName);
+                      if (selfIndex >= 0) {
+                        const [summoned] = player.hand.splice(selfIndex, 1);
+                        summoned.faceUp = true; summoned.position = 'ATTACK'; summoned.summonKind = 'SPECIAL'; summoned.hasAttacked = false;
+                        player.monsters[empty] = summoned;
+                        if (isFaris) {
+                          const visionIdx = player.deck.findIndex(c => c.name.startsWith('Vision HERO'));
+                          if (visionIdx >= 0) { const [vision] = player.deck.splice(visionIdx, 1); vision.faceUp = true; vision.position = 'DEFENSE'; player.spells[0] = player.spells[0] || { ...vision, faceUp: true, position: 'DEFENSE' }; }
+                        }
+                      }
+                      return { ...prev, player };
+                    });
+                    addLog(`[${summonName}] discarded ${choice.card.name} and was Special Summoned.`);
+                  } else if (pendingSelection.effect === 'HONEST_NEOS') {
                     setState(prev => {
                       const player = { ...prev.player, hand: [...prev.player.hand], graveyard: [...prev.player.graveyard], monsters: [...prev.player.monsters] };
                       const handIndex = player.hand.findIndex(c => c.name === 'Elemental HERO Honest Neos');
