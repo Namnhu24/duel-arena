@@ -434,10 +434,11 @@ export const CARD_DATABASE: CardDefinition[] = [
     hasGyEffect: true,
     art: 'https://cdn.ygovietnam.com/storage/Card/31440046.jpg',
     text: 'If this card is sent to the GY as material for the Fusion or Link Summon of a "Prank-Kids" monster: You can banish 1 card from your hand; draw 1 card, then you can Special Summon 1 "Prank-Kids" monster from your hand or Deck in Defense Position.',
-    gyEffect: ({ owner, log }) => {
+    gyEffect: ({ owner, log, selectedBanishCard }) => {
       const idx = owner.graveyard.findIndex(c => c.name === 'Prank-Kids Rocksies');
-      if (idx >= 0 && owner.hand.length > 0) {
-        const [banishedCard] = owner.hand.splice(0, 1);
+      const handIdx = selectedBanishCard ? owner.hand.findIndex(c => c.uid === selectedBanishCard.uid) : -1;
+      if (idx >= 0 && handIdx >= 0) {
+        const [banishedCard] = owner.hand.splice(handIdx, 1);
         owner.banished.push(banishedCard);
         if (owner.deck.length > 0) {
           const drawn = owner.deck.pop()!;

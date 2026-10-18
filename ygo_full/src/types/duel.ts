@@ -76,6 +76,7 @@ export interface CardEffectContext {
   log: (msg: string) => void;
   triggerSource?: string;
   target?: CardInstance | null;
+  selectedBanishCard?: CardInstance | null;
 }
 
 export interface CardDefinition {

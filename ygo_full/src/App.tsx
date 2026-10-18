@@ -155,7 +155,7 @@ export default function App() {
   const [actionList, setActionList] = useState<CardActionItem[]>([]);
   const [pendingSummonChoice, setPendingSummonChoice] = useState<CardInstance | null>(null);
   const [isMuted, setIsMuted] = useState(false);
-  const [pendingSelection, setPendingSelection] = useState<{ title: string; description: string; candidates: { card: CardInstance; source: 'hand' | 'deck' | 'playerGY' | 'aiGY' | 'field' }[]; effect: 'DROPSIES' | 'REBORN' | 'HONEST_NEOS' } | null>(null);
+  const [pendingSelection, setPendingSelection] = useState<{ title: string; description: string; candidates: { card: CardInstance; source: 'hand' | 'deck' | 'playerGY' | 'aiGY' | 'field' }[]; effect: 'DROPSIES' | 'REBORN' | 'HONEST_NEOS' | 'ROCKSIES_BANISH' } | null>(null);
 
   // Tribute Selection Modal State
   const [tributeState, setTributeState] = useState<{
@@ -1026,7 +1026,7 @@ export default function App() {
     }, 1200);
   };
 
-  // Normal / Tribute Summon request
+  // Normal / Tribute Summon request. Special Summons use their own effect paths and never consume this once-per-turn allowance.
   const requestNormalSummon = (card: CardInstance, mode: 'SUMMON' | 'SET') => {
     if (state.normalSummonUsed) {
       addLog('You have already used your Normal Summon/Set this turn.');
@@ -1035,7 +1035,6 @@ export default function App() {
 
     const isP1 = state.activeSide === 'player';
     const activePlayer = isP1 ? state.player : state.ai;
-
     const tributesRequired = getRequiredTributes(card.level || 1);
     const availableMonsters = activePlayer.monsters.filter((m): m is CardInstance => m !== null);
 
@@ -1044,75 +1043,79 @@ export default function App() {
         addLog(`Cannot Summon ${card.name}: Level ${card.level} requires ${tributesRequired} Tribute(s), but you control ${availableMonsters.length} monster(s).`);
         return;
       }
-      setTributeState({
-        card,
-        mode,
-        requiredCount: tributesRequired,
-      });
+      // Do not require an empty zone before tributing: the tribute(s) themselves free the slot.
+      setTributeState({ card, mode, requiredCount: tributesRequired });
       return;
     }
 
-    executeSummon(card, mode, []);
-  };
-
-  // Execute Summon
-  const executeSummon = (card: CardInstance, mode: 'SUMMON' | 'SET', tributeUids: number[]) => {
-    const isP1 = state.activeSide === 'player';
-    const activePlayer = isP1 ? state.player : state.ai;
-
-    const emptySlot = activePlayer.monsters.findIndex(m => m === null);
-    if (emptySlot < 0 && tributeUids.length === 0) {
+    if (activePlayer.monsters.every(Boolean)) {
       addLog('No open Monster Zones available.');
       return;
     }
+    executeSummon(card, mode, []);
+  };
 
+  // Execute a Normal Summon/Set, including Tribute Summons on a full field.
+  const executeSummon = (card: CardInstance, mode: 'SUMMON' | 'SET', tributeUids: number[]) => {
+    if (state.normalSummonUsed) {
+      addLog('You have already used your Normal Summon/Set this turn.');
+      return;
+    }
+    const isP1 = state.activeSide === 'player';
+    const activePlayer = isP1 ? state.player : state.ai;
+    const requiredTributes = getRequiredTributes(card.level || 1);
+    if (tributeUids.length !== requiredTributes) {
+      addLog(`You must select exactly ${requiredTributes} Tribute(s) for ${card.name}.`);
+      return;
+    }
+    const validTributes = tributeUids.every(uid => activePlayer.monsters.some(m => m?.uid === uid));
+    if (!validTributes || new Set(tributeUids).size !== tributeUids.length) {
+      addLog('Invalid Tribute selection. Please choose your own monsters currently on the field.');
+      return;
+    }
     const idx = activePlayer.hand.findIndex(c => c.uid === card.uid);
     if (idx < 0) return;
+    const remainingZones = activePlayer.monsters.filter(m => m && !tributeUids.includes(m.uid)).length;
+    if (remainingZones >= activePlayer.monsters.length) {
+      addLog('No open Monster Zones available after Tributing.');
+      return;
+    }
 
     sound.playSummon();
     setState(prev => {
-      const curP = isP1 ? { ...prev.player } : { ...prev.ai };
-
+      const curP = isP1
+        ? { ...prev.player, hand: [...prev.player.hand], graveyard: [...prev.player.graveyard], monsters: [...prev.player.monsters] }
+        : { ...prev.ai, hand: [...prev.ai.hand], graveyard: [...prev.ai.graveyard], monsters: [...prev.ai.monsters] };
       tributeUids.forEach(uid => {
-        const mIdx = curP.monsters.findIndex(m => m && m.uid === uid);
+        const mIdx = curP.monsters.findIndex(m => m?.uid === uid);
         if (mIdx >= 0) {
           const t = curP.monsters[mIdx]!;
           curP.monsters[mIdx] = null;
           curP.graveyard.push(t);
         }
       });
-
       const slot = curP.monsters.findIndex(m => m === null);
-      const [summoned] = curP.hand.splice(idx, 1);
+      if (slot < 0) return prev;
+      const currentHandIndex = curP.hand.findIndex(c => c.uid === card.uid);
+      if (currentHandIndex < 0) return prev;
+      const [summoned] = curP.hand.splice(currentHandIndex, 1);
       summoned.faceUp = mode === 'SUMMON';
       summoned.position = mode === 'SUMMON' ? 'ATTACK' : 'DEFENSE';
       summoned.placedTurn = prev.turn;
       summoned.hasAttacked = false;
+      summoned.summonKind = mode === 'SUMMON' ? 'NORMAL' : 'SET';
       curP.monsters[slot] = summoned;
 
       if (isOnlineMatch) {
-        multiplayer.syncAction('SUMMON', {
-          cardName: card.name,
-          slotIndex: slot,
-          faceUp: mode === 'SUMMON',
-          position: summoned.position,
-        });
+        multiplayer.syncAction('SUMMON', { cardName: card.name, slotIndex: slot, faceUp: mode === 'SUMMON', position: summoned.position });
       }
-
-      return {
-        ...prev,
-        player: isP1 ? curP : prev.player,
-        ai: isP1 ? prev.ai : curP,
-        normalSummonUsed: true,
-      };
+      return { ...prev, player: isP1 ? curP : prev.player, ai: isP1 ? prev.ai : curP, normalSummonUsed: true };
     });
 
     const isTribute = tributeUids.length > 0;
-    addLog(
-      mode === 'SUMMON'
-        ? `Normal Summoned [${card.name}] (ATK ${card.atk} / DEF ${card.def})${isTribute ? ` with ${tributeUids.length} Tribute(s)` : ''}!`
-        : `Set [${card.name}] face-down${isTribute ? ` with ${tributeUids.length} Tribute(s)` : ''}.`
-    );
+    addLog(mode === 'SUMMON'
+      ? `Normal Summoned [${card.name}] (ATK ${card.atk} / DEF ${card.def})${isTribute ? ` with ${tributeUids.length} Tribute(s)` : ''}!`
+      : `Set [${card.name}] face-down${isTribute ? ` with ${tributeUids.length} Tribute(s)` : ''}.`);
   };
 
   // Change Position
@@ -1273,6 +1276,12 @@ export default function App() {
     sound.playEffectChime();
     const owner = gyOwnerSide === 'player' ? state.player : state.ai;
     const opponent = gyOwnerSide === 'player' ? state.ai : state.player;
+    if (card.name === 'Prank-Kids Rocksies') {
+      const candidates = owner.hand.map(card => ({ card, source: 'hand' as const }));
+      if (!candidates.length) { addLog('[Prank-Kids Rocksies] You have no card in your hand to banish.'); return; }
+      setPendingSelection({ title: 'PRANK-KIDS ROCKSIES', description: 'Choose the card from your hand to banish for this effect.', candidates, effect: 'ROCKSIES_BANISH' });
+      return;
+    }
     if (card.name === 'Prank-Kids Dropsies') {
       const candidates = [
         ...owner.hand.filter(c => c.name.startsWith('Prank-Kids') && c.name !== card.name).map(card => ({ card, source: 'hand' as const })),
@@ -2015,6 +2024,21 @@ export default function App() {
                       return { ...prev, player };
                     });
                     addLog(`[Honest Neos] ${choice.card.name} gains 2500 ATK until the end of the turn.`);
+                  } else if (pendingSelection.effect === 'ROCKSIES_BANISH') {
+                    const ownerSide = gyOwnerSide;
+                    const owner = ownerSide === 'player' ? state.player : state.ai;
+                    const opponent = ownerSide === 'player' ? state.ai : state.player;
+                    const rocksies = owner.graveyard.find(c => c.name === 'Prank-Kids Rocksies');
+                    if (!rocksies || !owner.hand.some(c => c.uid === choice.card.uid)) {
+                      addLog('[Prank-Kids Rocksies] The selected card is no longer available.');
+                      setPendingSelection(null);
+                      return;
+                    }
+                    rocksies.gyEffect?.({ card: rocksies, owner, opponent, ownerSide, gameState: state, log: addLog, selectedBanishCard: choice.card });
+                    setState(prev => ownerSide === 'player'
+                      ? { ...prev, player: { ...prev.player, hand: [...prev.player.hand], deck: [...prev.player.deck], graveyard: [...prev.player.graveyard], banished: [...prev.player.banished], monsters: [...prev.player.monsters] } }
+                      : { ...prev, ai: { ...prev.ai, hand: [...prev.ai.hand], deck: [...prev.ai.deck], graveyard: [...prev.ai.graveyard], banished: [...prev.ai.banished], monsters: [...prev.ai.monsters] } });
+                    addLog(`[Prank-Kids Rocksies] You chose ${choice.card.name} to banish.`);
                   } else if (pendingSelection.effect === 'DROPSIES') {
                     const owner = gyOwnerSide === 'player' ? state.player : state.ai;
                     const empty = owner.monsters.findIndex(m => m === null);
