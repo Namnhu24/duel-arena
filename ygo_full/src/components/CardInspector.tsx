@@ -6,6 +6,7 @@
 import React from 'react';
 import { CardInstance } from '../types/duel';
 import { Shield, Sparkles, Zap, Flame, Droplets, Sun, Moon, Wind, Globe } from 'lucide-react';
+import { getSummonRequirement } from '../utils/summonRequirements';
 
 interface CardInspectorProps {
   card: CardInstance | null;
@@ -102,6 +103,17 @@ export const CardInspector: React.FC<CardInspectorProps> = ({
       <div className="p-3 text-xs text-stone-200 leading-relaxed max-h-[140px] overflow-y-auto scrollbar-thin scrollbar-thumb-sky-600/50 bg-[#08121e]">
         <p className="whitespace-pre-line">{card.text || 'No effect text.'}</p>
       </div>
+
+      {/* Extra Deck summon materials */}
+      {card.extraKind && (
+        <div className="px-3 py-2.5 bg-amber-950/40 border-y border-amber-500/40">
+          <div className="flex items-center gap-1.5 mb-1">
+            <Shield className="w-3.5 h-3.5 text-amber-300" />
+            <span className="text-[10px] font-['Orbitron'] font-bold uppercase tracking-wide text-amber-300">Summon Materials · {card.extraKind}</span>
+          </div>
+          <p className="text-xs text-stone-100 leading-relaxed whitespace-pre-line">{getSummonRequirement(card)}</p>
+        </div>
+      )}
 
       {/* Action Buttons if special skills are available */}
       <div className="p-2.5 bg-[#0b1c2b] border-t border-[#2d5673] flex flex-col gap-1.5">

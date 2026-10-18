@@ -7,6 +7,7 @@ import React, { useState } from 'react';
 import { CardInstance, PlayerState } from '../types/duel';
 import { Layers, X, Sparkles, Zap, Shield } from 'lucide-react';
 import { sound } from '../utils/audio';
+import { getSummonRequirement } from '../utils/summonRequirements';
 
 interface ExtraDeckModalProps {
   isOpen: boolean;
@@ -64,21 +65,6 @@ export const ExtraDeckModal: React.FC<ExtraDeckModalProps> = ({
       return materials.length >= 2;
     }
     return false;
-  };
-
-  // Highlight only Extra Deck monsters for which the current field/hand has a legal material combination.
-  const hasLegalCombination = (extra: CardInstance) => {
-    const pool = extra.extraKind === 'FUSION' ? [...fieldMonsters, ...handMonsters] : fieldMonsters;
-    const max = Math.min(3, pool.length);
-    const test = (start: number, picked: CardInstance[]): boolean => {
-      if (picked.length >= 2 && checkCanSummon(extra, picked)) return true;
-      if (picked.length >= max) return false;
-      for (let i = start; i < pool.length; i++) {
-        if (test(i + 1, [...picked, pool[i]])) return true;
-      }
-      return false;
-    };
-    return test(0, []);
   };
 
   const handleToggleMaterial = (uid: number) => {
@@ -145,8 +131,8 @@ export const ExtraDeckModal: React.FC<ExtraDeckModalProps> = ({
                     className={`cursor-pointer rounded-xl overflow-hidden border p-2 bg-[#0e2133] transition-all ${
                       isSelected
                         ? 'border-amber-300 ring-2 ring-amber-400 shadow-[0_0_22px_rgba(245,190,50,0.85)] scale-105'
-                        : hasLegalCombination(card)
-                          ? 'border-cyan-300 ring-2 ring-cyan-400/80 shadow-[0_0_20px_rgba(34,211,238,0.8)] animate-pulse hover:border-amber-300 hover:shadow-[0_0_24px_rgba(251,191,36,0.75)]'
+                        : fieldMonsters.length >= 2
+                          ? 'border-sky-400/90 shadow-[0_0_12px_rgba(56,189,248,0.35)] hover:border-amber-300 hover:shadow-[0_0_18px_rgba(251,191,36,0.6)]'
                           : 'border-[#2d5673] hover:border-sky-400 hover:scale-102'
                     }`}
                   >
@@ -170,7 +156,7 @@ export const ExtraDeckModal: React.FC<ExtraDeckModalProps> = ({
             <div className="bg-[#0b1929] border border-[#2e5d7d] rounded-xl p-4">
               <div className="flex items-center justify-between mb-2">
                 <h4 className="font-['Orbitron'] font-bold text-xs text-amber-300">
-                  2. REQUIRED MATERIALS: {selectedExtraCard.materialText}
+                  2. REQUIRED MATERIALS: {getSummonRequirement(selectedExtraCard)}
                 </h4>
                 <span className="text-xs text-stone-300">
                   Selected: {selectedMaterialUids.length} monster(s)
@@ -192,7 +178,7 @@ export const ExtraDeckModal: React.FC<ExtraDeckModalProps> = ({
                         className={`p-2 rounded-lg border text-left flex flex-col items-center transition-all ${
                           isPicked
                             ? 'bg-amber-950/70 border-amber-400 ring-2 ring-amber-400 shadow-md scale-105'
-                            : 'bg-[#102538] border-cyan-300/80 shadow-[0_0_12px_rgba(34,211,238,0.45)] hover:border-amber-300 hover:shadow-[0_0_18px_rgba(251,191,36,0.65)]'
+                            : 'bg-[#102538] border-sky-400/70 shadow-[0_0_10px_rgba(56,189,248,0.25)] hover:border-amber-300 hover:shadow-[0_0_16px_rgba(251,191,36,0.55)]'
                         }`}
                       >
                         <div className="w-14 aspect-[3/4] rounded overflow-hidden mb-1">

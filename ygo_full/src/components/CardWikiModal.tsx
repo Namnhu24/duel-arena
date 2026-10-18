@@ -7,6 +7,7 @@ import { CardDefinition } from '../types/duel';
 import { CARD_DATABASE } from '../data/cardDatabase';
 import { Search, BookOpen, Star, Sparkles, X, Sun, Moon, Flame, Droplets, Wind, Globe, Zap, ShieldAlert } from 'lucide-react';
 import { sound } from '../utils/audio';
+import { getSummonRequirement } from '../utils/summonRequirements';
 
 interface CardWikiModalProps {
   isOpen: boolean;
@@ -207,6 +208,14 @@ export const CardWikiModal: React.FC<CardWikiModalProps> = ({ isOpen, onClose })
                 {inspectedCard.text}
               </p>
             </div>
+
+            {/* Extra Deck Summon Materials */}
+            {inspectedCard.extraKind && (
+              <div className="p-3.5 bg-amber-950/30 rounded-xl border border-amber-500/50">
+                <span className="text-[10px] font-['Orbitron'] font-bold text-amber-300 uppercase block mb-1">Summon Materials · {inspectedCard.extraKind}</span>
+                <p className="text-xs text-stone-100 leading-relaxed whitespace-pre-line">{getSummonRequirement(inspectedCard)}</p>
+              </div>
+            )}
 
             {/* Strategy & Synergy Tips */}
             <div className="p-3.5 bg-[#0c2438] rounded-xl border border-sky-500/40">
