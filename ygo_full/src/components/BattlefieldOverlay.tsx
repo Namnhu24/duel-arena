@@ -366,11 +366,18 @@ export const BattlefieldOverlay: React.FC<BattlefieldOverlayProps> = ({
         {/* Player Spell & Trap Zones (5 Zones) */}
         <div className="flex items-center justify-center gap-2 md:gap-3.5 w-full max-w-4xl">
           {/* Player Extra Deck Plinth */}
-          <div className={`w-[62px] h-[90px] md:w-[72px] md:h-[105px] rounded-lg border bg-[#241a0d]/60 flex flex-col items-center justify-center text-center transition-all ${state.player.extraDeck.length > 0 && hasPotentialExtraSummon(state.player.extraDeck, state.player.monsters.filter((m): m is CardInstance => m !== null && m.faceUp), state.player.hand.filter(c => c.type === 'MONSTER')) ? 'border-emerald-300 ring-2 ring-emerald-400 shadow-[0_0_24px_rgba(52,211,153,.95)] animate-pulse' : 'border-amber-500/60'}`}>
+          <button
+            type="button"
+            onClick={() => onEmzClick(0)}
+            aria-label="Open Extra Deck and summon a Fusion, Synchro, Xyz, or Link Monster"
+            title="Click to open Extra Deck and choose a monster to summon"
+            className={`pointer-events-auto cursor-pointer w-[62px] h-[90px] md:w-[72px] md:h-[105px] rounded-lg border bg-[#241a0d]/60 flex flex-col items-center justify-center text-center transition-all hover:scale-105 focus:outline-none focus:ring-2 focus:ring-amber-300 ${state.player.extraDeck.length > 0 && hasPotentialExtraSummon(state.player.extraDeck, state.player.monsters.filter((m): m is CardInstance => m !== null && m.faceUp), state.player.hand.filter(c => c.type === 'MONSTER')) ? 'border-emerald-300 ring-2 ring-emerald-400 shadow-[0_0_24px_rgba(52,211,153,.95)] animate-pulse' : 'border-amber-500/60 hover:border-amber-300 hover:shadow-[0_0_18px_rgba(251,191,36,.6)]'}`}
+          >
             <Layers className="w-4 h-4 text-amber-400 mb-1" />
             <span className="text-[9px] font-['Orbitron'] text-amber-300 font-bold">EXTRA</span>
             <span className="text-xs font-['Orbitron'] text-white font-extrabold">{state.player.extraDeck.length}</span>
-          </div>
+            <span className="text-[7px] text-amber-100/80 mt-1">CLICK TO SUMMON</span>
+          </button>
 
           {state.player.spells.map((card, idx) => (
             <div
