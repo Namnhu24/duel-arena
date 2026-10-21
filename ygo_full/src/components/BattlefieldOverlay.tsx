@@ -38,11 +38,16 @@ export const BattlefieldOverlay: React.FC<BattlefieldOverlayProps> = ({
   const hasAttacker = state.selectedAttackerUid !== null;
 
   // Targeting checks
-  const p1HasMonsters = state.player.monsters.some(Boolean);
-  const p2HasMonsters = state.ai.monsters.some(Boolean);
+  // Include Extra Monster Zones in combat checks; these are real monsters on the field.
+  const p1HasMonsters = state.player.monsters.some(Boolean) || Boolean(state.extraMonsterZone?.[0]);
+  const p2HasMonsters = state.ai.monsters.some(Boolean) || Boolean(state.extraMonsterZone?.[1]);
 
-  const canP1DirectAttack = isBattlePhase && isP1Turn && hasAttacker && !p2HasMonsters;
-  const canP2DirectAttack = isBattlePhase && isP2Turn && hasAttacker && !p1HasMonsters;
+  const selectedP1Attacker = state.player.monsters.find(m => m && m.uid === state.selectedAttackerUid) || null;
+  const selectedP2Attacker = state.ai.monsters.find(m => m && m.uid === state.selectedAttackerUid) || null;
+  const allowsDirectAttack = (card: CardInstance | null) => !!card && /can attack directly|can make a direct attack/i.test(card.text || '') && !/cannot attack directly/i.test(card.text || '');
+  const attackerCanDeclare = (card: CardInstance | null) => !!card && card.faceUp && card.position === 'ATTACK' && !card.hasAttacked;
+  const canP1DirectAttack = isBattlePhase && isP1Turn && attackerCanDeclare(selectedP1Attacker) && (!p2HasMonsters || allowsDirectAttack(selectedP1Attacker));
+  const canP2DirectAttack = isBattlePhase && isP2Turn && attackerCanDeclare(selectedP2Attacker) && (!p1HasMonsters || allowsDirectAttack(selectedP2Attacker));
 
   const canDirectAttack = canP1DirectAttack || canP2DirectAttack;
 
@@ -232,7 +237,7 @@ export const BattlefieldOverlay: React.FC<BattlefieldOverlayProps> = ({
             />
           ) : (
             <span className="text-[9px] font-['Orbitron'] text-purple-300 font-bold text-center">
-              EXTRA ZONE
+              PLAYER EXTRA ZONE
             </span>
           )}
         </div>
@@ -262,7 +267,7 @@ export const BattlefieldOverlay: React.FC<BattlefieldOverlayProps> = ({
             />
           ) : (
             <span className="text-[9px] font-['Orbitron'] text-purple-300 font-bold text-center">
-              EXTRA ZONE
+              CPU EXTRA ZONE
             </span>
           )}
         </div>
@@ -366,18 +371,11 @@ export const BattlefieldOverlay: React.FC<BattlefieldOverlayProps> = ({
         {/* Player Spell & Trap Zones (5 Zones) */}
         <div className="flex items-center justify-center gap-2 md:gap-3.5 w-full max-w-4xl">
           {/* Player Extra Deck Plinth */}
-          <button
-            type="button"
-            onClick={() => onEmzClick(0)}
-            aria-label="Open Extra Deck and summon a Fusion, Synchro, Xyz, or Link Monster"
-            title="Click to open Extra Deck and choose a monster to summon"
-            className={`pointer-events-auto cursor-pointer w-[62px] h-[90px] md:w-[72px] md:h-[105px] rounded-lg border bg-[#241a0d]/60 flex flex-col items-center justify-center text-center transition-all hover:scale-105 focus:outline-none focus:ring-2 focus:ring-amber-300 ${state.player.extraDeck.length > 0 && hasPotentialExtraSummon(state.player.extraDeck, state.player.monsters.filter((m): m is CardInstance => m !== null && m.faceUp), state.player.hand.filter(c => c.type === 'MONSTER')) ? 'border-emerald-300 ring-2 ring-emerald-400 shadow-[0_0_24px_rgba(52,211,153,.95)] animate-pulse' : 'border-amber-500/60 hover:border-amber-300 hover:shadow-[0_0_18px_rgba(251,191,36,.6)]'}`}
-          >
+          <div className={`w-[62px] h-[90px] md:w-[72px] md:h-[105px] rounded-lg border bg-[#241a0d]/60 flex flex-col items-center justify-center text-center transition-all ${state.player.extraDeck.length > 0 && hasPotentialExtraSummon(state.player.extraDeck, state.player.monsters.filter((m): m is CardInstance => m !== null && m.faceUp), state.player.hand.filter(c => c.type === 'MONSTER')) ? 'border-emerald-300 ring-2 ring-emerald-400 shadow-[0_0_24px_rgba(52,211,153,.95)] animate-pulse' : 'border-amber-500/60'}`}>
             <Layers className="w-4 h-4 text-amber-400 mb-1" />
             <span className="text-[9px] font-['Orbitron'] text-amber-300 font-bold">EXTRA</span>
             <span className="text-xs font-['Orbitron'] text-white font-extrabold">{state.player.extraDeck.length}</span>
-            <span className="text-[7px] text-amber-100/80 mt-1">CLICK TO SUMMON</span>
-          </button>
+          </div>
 
           {state.player.spells.map((card, idx) => (
             <div

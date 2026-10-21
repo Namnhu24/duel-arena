@@ -209,7 +209,7 @@ export const ThreeBattlefield: React.FC<ThreeBattlefieldProps> = ({
       currentMonsterCards.push({ card: state.extraMonsterZone[0], side: 'player', zoneIndex: 0, isEMZ: true });
     }
     if (state.extraMonsterZone[1] && state.extraMonsterZone[1].faceUp) {
-      currentMonsterCards.push({ card: state.extraMonsterZone[1], side: 'player', zoneIndex: 1, isEMZ: true });
+      currentMonsterCards.push({ card: state.extraMonsterZone[1], side: 'ai', zoneIndex: 1, isEMZ: true });
     }
 
     const currentUids = new Set(currentMonsterCards.map(c => c.card.uid));

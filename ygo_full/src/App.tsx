@@ -647,13 +647,14 @@ export default function App() {
     }
   };
 
-  // AI Turn (Solo & Survival Mode)
-  const runAiTurn = () => {
+  // AI turn resolver (Solo & Survival Mode). The wrapper below exposes a paced, inspectable phase sequence.
+  const resolveAiTurn = () => {
     if (isOnlineMatch || state.gameMode === 'LOCAL_2P') return;
 
     setState(prev => {
       const ai = { ...prev.ai };
       const player = { ...prev.player };
+      const nextExtraMonsterZone = [...prev.extraMonsterZone];
       let newTurn = prev.turn + 1;
 
       // Draw
@@ -813,16 +814,18 @@ export default function App() {
         const sunriseIdx = ai.extraDeck.findIndex(c => c.name === 'Elemental HERO Sunrise');
         const heroField = ai.monsters.map((m, slot) => ({ m, slot })).filter(x => x.m && /HERO/.test(x.m.name));
         const heroHand = ai.hand.filter(c => c.type === 'MONSTER' && /HERO/.test(c.name));
-        if (polyIdx >= 0 && sunriseIdx >= 0 && heroField.length + heroHand.length >= 2 && freeMonsterSlot() >= 0) {
+        const sunriseMaterials = heroField.map(x => x.m!).filter(Boolean);
+        const distinctHeroPair = sunriseMaterials.find((a, i) => sunriseMaterials.some((b, j) => j > i && a.attribute !== b.attribute));
+        if (polyIdx >= 0 && sunriseIdx >= 0 && distinctHeroPair && freeMonsterSlot() >= 0) {
           let used = 0;
-          for (const item of heroField) {
-            if (used >= 2) break;
-            if (item.m) { ai.graveyard.push(item.m); ai.monsters[item.slot] = null; used++; }
-          }
-          while (used < 2) {
-            const idx = ai.hand.findIndex(c => c.type === 'MONSTER' && /HERO/.test(c.name));
-            if (idx < 0) break;
-            ai.graveyard.push(ai.hand.splice(idx, 1)[0]); used++;
+          const firstHero = distinctHeroPair;
+          const secondHero = heroField.map(x => x.m!).find(m => m && m.uid !== firstHero.uid && m.attribute !== firstHero.attribute);
+          if (firstHero && secondHero) {
+            for (const item of heroField) {
+              if (item.m && (item.m.uid === firstHero.uid || item.m.uid === secondHero.uid)) {
+                ai.graveyard.push(item.m); ai.monsters[item.slot] = null; used++;
+              }
+            }
           }
           if (used === 2) {
             const pidx = ai.hand.findIndex(c => c.name === 'Polymerization');
@@ -926,39 +929,122 @@ export default function App() {
         ai.spells[emptySpell] = trapCard;
       }
 
-      // Generic CPU Extra Deck lines: Synchro, Xyz, Link and Fusion when material checks pass.
-      const extraSlot = ai.monsters.findIndex(m => m === null);
-      if (extraSlot >= 0) {
-        const field = ai.monsters.filter((m): m is CardInstance => m !== null && m.faceUp);
-        const extraIndex = ai.extraDeck.findIndex(extra => {
-          if (extra.extraKind === 'XYZ') return field.filter(m => (m.level || 0) === (extra.level || 4)).length >= 2;
-          if (extra.extraKind === 'SYNCHRO') {
-            const tuners = field.filter(m => m.tuner);
-            return tuners.some(t => field.some(n => !n.tuner && n.uid !== t.uid && (t.level || 0) + (n.level || 0) === (extra.level || 0)));
+      // Generic CPU Extra Deck summons: never summon unless the actual materials
+      // satisfy the target monster's basic material requirements.
+      {
+        const field = ai.monsters.filter((m): m is CardInstance => m !== null && m.faceUp && m.type === 'MONSTER');
+        const emzAvailable = !nextExtraMonsterZone[1]; // CPU owns the right/upper Extra Monster Zone.
+        const pickFusionMaterials = (extra: CardInstance): CardInstance[] => {
+          const text = (extra.materialText || '').toLowerCase();
+          // Fusion materials may come from the CPU's hand or field.
+          const pool = [...field, ...ai.hand.filter(c => c.type === 'MONSTER')];
+          // Specific archetype / named materials are required when stated on the card.
+          if (/blue-eyes white dragon/.test(text)) {
+            const need = Math.max(1, (text.match(/\b(\d+)\s+blue-eyes white dragon/) || [])[1] ? Number((text.match(/\b(\d+)\s+blue-eyes white dragon/) || [])[1]) : 1);
+            const mats = pool.filter(m => m.name === 'Blue-Eyes White Dragon').slice(0, need);
+            return mats.length >= need ? mats : [];
           }
-          if (extra.extraKind === 'LINK') return field.filter(m => m.subtype !== 'Normal').length >= (extra.linkRating || 2);
-          if (extra.extraKind === 'FUSION') return field.length >= 2 && (ai.hand.some(c => c.name === 'Polymerization') || /Cyber|HERO|Prank-Kids/i.test(ai.name));
-          return false;
-        });
-        if (extraIndex >= 0) {
-          const extra = ai.extraDeck[extraIndex];
-          let materials: CardInstance[] = [];
-          if (extra.extraKind === 'XYZ') materials = field.filter(m => (m.level || 0) === (extra.level || 4)).slice(0, 2);
-          else if (extra.extraKind === 'SYNCHRO') {
-            const tuner = field.find(m => m.tuner && field.some(n => !n.tuner && n.uid !== m.uid && (m.level || 0) + (n.level || 0) === (extra.level || 0)));
-            const nonTuner = tuner && field.find(n => !n.tuner && n.uid !== tuner.uid && (n.level || 0) + (tuner.level || 0) === (extra.level || 0));
-            if (tuner && nonTuner) materials = [tuner, nonTuner];
-          } else if (extra.extraKind === 'LINK') materials = field.filter(m => m.subtype !== 'Normal').slice(0, extra.linkRating || 2);
-          else if (extra.extraKind === 'FUSION') materials = field.slice(0, 2);
-          if (materials.length >= 1 && (extra.extraKind !== 'SYNCHRO' || materials.length >= 2)) {
-            materials.forEach(mat => { const idx = ai.monsters.findIndex(m => m?.uid === mat.uid); if (idx >= 0) { ai.monsters[idx] = null; if (extra.extraKind === 'XYZ') extra.materials.push(mat); else ai.graveyard.push(mat); } });
-            const [boss] = ai.extraDeck.splice(extraIndex, 1);
-            boss.faceUp = true; boss.position = 'ATTACK'; boss.placedTurn = newTurn; boss.hasAttacked = false; boss.summonKind = extra.extraKind;
+          if (/cyber dragon/.test(text)) {
+            const need = Math.max(1, Number((text.match(/\b(\d+)\s+(?:or more\s+)?cyber dragon/) || [])[1] || 1));
+            const mats = pool.filter(m => m.name === 'Cyber Dragon' || /Cyber Dragon (?:Core|Herz|Nachster|Vier)/.test(m.name)).slice(0, need);
+            return mats.length >= need ? mats : [];
+          }
+          if (/hero/.test(text)) {
+            const need = Math.max(2, Number((text.match(/\b(\d+)\s+(?:hero|heroes)/) || [])[1] || 2));
+            let mats = pool.filter(m => /HERO/.test(m.name));
+            if (/different attributes/.test(text)) {
+              const distinct: CardInstance[] = [];
+              for (const m of mats) if (!distinct.some(x => x.attribute === m.attribute)) distinct.push(m);
+              mats = distinct;
+            }
+            return mats.length >= need ? mats.slice(0, need) : [];
+          }
+          if (/prank-kids/.test(text)) {
+            const need = Math.max(2, Number((text.match(/\b(\d+)\s+(?:"?prank-kids)/) || [])[1] || 2));
+            const mats = pool.filter(m => /Prank-Kids/.test(m.name)).slice(0, need);
+            return mats.length >= need ? mats : [];
+          }
+          // Conservative fallback: generic Fusion materials still require enough monsters,
+          // but only when the card does not specify named/archetype materials.
+          const need = Number((text.match(/\b(\d+)\s+(?:or more\s+)?(?:monsters?|materials?)/) || [])[1] || 2);
+          return pool.length >= need ? pool.slice(0, need) : [];
+        };
+        const findValidSummon = ():
+          { index: number; materials: CardInstance[]; kind: 'FUSION'|'SYNCHRO'|'XYZ'|'LINK'; useEmz: boolean } | null => {
+          for (let i = 0; i < ai.extraDeck.length; i++) {
+            const extra = ai.extraDeck[i];
+            if (!extra.extraKind) continue;
+            let materials: CardInstance[] = [];
+            let useEmz = false;
+            if (extra.extraKind === 'XYZ') {
+              const rank = extra.level || 0;
+              const sameLevel = field.filter(m => (m.level || 0) === rank);
+              if (rank > 0 && sameLevel.length >= 2) materials = sameLevel.slice(0, 2);
+            } else if (extra.extraKind === 'SYNCHRO') {
+              const targetLevel = extra.level || 0;
+              outer: for (const tuner of field.filter(m => m.tuner || /Tuner/i.test(m.subtype || '') || /tuner/i.test(m.text || ''))) {
+                for (const nonTuner of field.filter(m => m.uid !== tuner.uid && !(m.tuner || /Tuner/i.test(m.subtype || '') || /tuner/i.test(m.text || '')))) {
+                  if ((tuner.level || 0) + (nonTuner.level || 0) === targetLevel) { materials = [tuner, nonTuner]; break outer; }
+                }
+              }
+            } else if (extra.extraKind === 'LINK') {
+              const rating = extra.linkRating || 2;
+              // Link materials must be Effect/Link monsters (no normal monsters); Link monsters
+              // can count as 1 or their Link Rating, and the total must equal the target rating.
+              const candidates = field.filter(m => m.subtype !== 'Normal');
+              const chosen: CardInstance[] = [];
+              let score = 0;
+              for (const m of candidates) {
+                const value = m.extraKind === 'LINK' ? (m.linkRating || 1) : 1;
+                if (score + value <= rating) { chosen.push(m); score += value; }
+                if (score === rating) break;
+              }
+              if (score === rating && chosen.length > 0 && emzAvailable) { materials = chosen; useEmz = true; }
+            } else if (extra.extraKind === 'FUSION') {
+              const hasFusionSpell = ai.hand.some(c => ['Polymerization','Power Bond','Miracle Fusion','Overload Fusion','Dark Calling'].includes(c.name));
+              if (hasFusionSpell || /Kaiser Ryo|Jaden Yuki|HERO|Cyber|Prank-Kids/i.test(ai.name)) materials = pickFusionMaterials(extra);
+            }
+            if (materials.length > 0 && (extra.extraKind !== 'LINK' || useEmz)) {
+              // Non-Link Extra Deck monsters need an available Main Monster Zone after materials leave.
+              const freed = materials.filter(m => ai.monsters.some(x => x?.uid === m.uid)).length;
+              const hasMainZone = ai.monsters.some(m => m === null) || freed > 0;
+              if (extra.extraKind === 'LINK' ? emzAvailable : hasMainZone) {
+                return { index: i, materials, kind: extra.extraKind, useEmz };
+              }
+            }
+          }
+          return null;
+        };
+        const summon = findValidSummon();
+        if (summon) {
+          const { index, materials, kind, useEmz } = summon;
+          const boss = ai.extraDeck[index];
+          for (const mat of materials) {
+            const slot = ai.monsters.findIndex(m => m?.uid === mat.uid);
+            if (slot >= 0) {
+              ai.monsters[slot] = null;
+              if (kind === 'XYZ') boss.materials.push(mat);
+              else ai.graveyard.push(mat);
+            } else if (kind === 'FUSION') {
+              const handIdx = ai.hand.findIndex(c => c.uid === mat.uid);
+              if (handIdx >= 0) ai.graveyard.push(ai.hand.splice(handIdx, 1)[0]);
+            }
+          }
+          if (kind === 'FUSION') {
+            const fusionSpellIdx = ai.hand.findIndex(c => ['Polymerization','Power Bond','Miracle Fusion','Overload Fusion','Dark Calling'].includes(c.name));
+            if (fusionSpellIdx >= 0) ai.graveyard.push(ai.hand.splice(fusionSpellIdx, 1)[0]);
+          }
+          ai.extraDeck.splice(index, 1);
+          boss.faceUp = true; boss.position = 'ATTACK'; boss.placedTurn = newTurn;
+          boss.hasAttacked = false; boss.summonKind = kind;
+          if (useEmz) {
+            nextExtraMonsterZone[1] = boss;
+          } else {
             const free = ai.monsters.findIndex(m => m === null);
             if (free >= 0) ai.monsters[free] = boss;
-            addLog(`${ai.name} performed a ${extra.extraKind} Summon: [${boss.name}]!`);
-            sound.playSpecialSummon();
           }
+          addLog(`${ai.name} performed a valid ${kind} Summon: [${boss.name}] using ${materials.map(m => m.name).join(', ')}.`);
+          sound.playSpecialSummon();
         }
       }
 
@@ -1035,7 +1121,7 @@ export default function App() {
             }
             ai.lp = Math.max(0, ai.lp + diff);
           } else {
-            // Equal ATK destroys only monsters that are not protected from battle destruction.
+            // Equal ATK: both monsters are destroyed simultaneously, unless each monster has battle-destruction protection.
             const pIdx = player.monsters.indexOf(target);
             const aIdx = ai.monsters.indexOf(attacker);
             if (pIdx >= 0 && !target.indestructibleByBattle) {
@@ -1069,6 +1155,7 @@ export default function App() {
         player,
         ai,
         aiFirstTurnComplete: true,
+        extraMonsterZone: nextExtraMonsterZone,
         lastAttackAnimation: attackAnim,
       };
     });
@@ -1096,6 +1183,27 @@ export default function App() {
         };
       });
     }, 1200);
+  };
+
+  // Pace the CPU turn so the player can read the action log and inspect the decision sequence.
+  // The current engine resolves the board as a single transaction after the phase walkthrough;
+  // the log labels are intentionally diagnostic, not a claim that each board mutation is already visible.
+  const runAiTurn = () => {
+    if (isOnlineMatch || state.gameMode === 'LOCAL_2P') return;
+    const phases = [
+      'CPU: Draw Phase — drawing a card and refreshing its monsters.',
+      'CPU: Main Phase — evaluating Field Spell and Spell Card effects.',
+      'CPU: Main Phase — evaluating Normal Summon and Tribute requirements.',
+      'CPU: Main Phase — setting Trap Cards and checking Extra Deck materials.',
+      'CPU: Battle Phase — checking attack targets and face-down Trap responses.',
+      'CPU: End Phase — resolving the turn and passing priority to you.'
+    ];
+    phases.forEach((message, index) => {
+      setTimeout(() => {
+        addLog(message);
+        if (index === phases.length - 1) resolveAiTurn();
+      }, (index + 1) * 5000);
+    });
   };
 
   // Normal / Tribute Summon request. Special Summons use their own effect paths and never consume this once-per-turn allowance.
@@ -1451,6 +1559,40 @@ export default function App() {
         addLog('Some selected materials are no longer available. Please select them again.');
         return prev;
       }
+      const mats = resolvedMaterials as CardInstance[];
+      const materialText = (extraCard.materialText || '').toLowerCase();
+      if (extraCard.extraKind === 'XYZ') {
+        const rank = extraCard.level || 4;
+        const countMatch = materialText.match(/\b(\d+)\s+(?:level\s+\d+\s+)?(?:monsters?|materials?)/);
+        const needed = countMatch ? Number(countMatch[1]) : 2;
+        if (mats.length !== needed || mats.some(m => !curP.monsters.some(x => x?.uid === m.uid) || !m.faceUp || (m.level || 0) !== rank)) {
+          addLog(`Xyz Summon cancelled: select ${needed} face-up Level ${rank} monster(s).`);
+          return prev;
+        }
+      } else if (extraCard.extraKind === 'SYNCHRO') {
+        const tuner = (m: CardInstance) => Boolean(m.tuner || /tuner/i.test(m.text || ''));
+        if (mats.length < 2 || !mats.some(tuner) || !mats.some(m => !tuner(m)) || mats.some(m => !curP.monsters.some(x => x?.uid === m.uid)) || mats.reduce((n, m) => n + (m.level || 0), 0) !== (extraCard.level || 0)) {
+          addLog(`Synchro Summon cancelled: materials must include a Tuner and non-Tuner whose Levels total ${extraCard.level || '?'}.`);
+          return prev;
+        }
+      } else if (extraCard.extraKind === 'LINK') {
+        const rating = extraCard.linkRating || 2;
+        const score = mats.reduce((n, m) => n + (m.extraKind === 'LINK' ? (m.linkRating || 1) : 1), 0);
+        if (mats.some(m => !curP.monsters.some(x => x?.uid === m.uid) || !m.faceUp || m.subtype === 'Normal') || score !== rating) {
+          addLog(`Link Summon cancelled: select valid face-up Effect Monsters totaling Link-${rating}.`);
+          return prev;
+        }
+      } else if (extraCard.extraKind === 'FUSION') {
+        const name = extraCard.name.toLowerCase();
+        let valid = mats.length >= 2;
+        if (name.includes('blue-eyes ultimate')) valid = mats.length === 3 && mats.every(m => m.name === 'Blue-Eyes White Dragon');
+        else if (name.includes('flame wingman')) valid = mats.length === 2 && mats.some(m => /Avian/i.test(m.name)) && mats.some(m => /Burstinatrix/i.test(m.name));
+        else if (name.includes('cyber twin dragon')) valid = mats.length === 2 && mats.every(m => /Cyber Dragon/i.test(m.name));
+        else if (name.includes('cyber end dragon')) valid = mats.length === 3 && mats.every(m => /Cyber Dragon/i.test(m.name));
+        else if (name.includes('rocket ride') || name.includes('weather washer')) valid = mats.length === 2 && mats.every(m => /Prank-Kids/i.test(m.name));
+        else if (/hero/i.test(name) && /hero/i.test(materialText)) valid = mats.length === 2 && mats.every(m => /HERO/i.test(m.name));
+        if (!valid) { addLog(`Fusion Summon cancelled: the selected materials do not match [${extraCard.name}]'s requirements.`); return prev; }
+      }
 
       // Remove the selected materials first so they can free space on a full field.
       for (const uid of materialUids) {
@@ -1470,9 +1612,11 @@ export default function App() {
       }
 
       const emptySlot = curP.monsters.findIndex(m => m === null);
-      const emz = prev.extraMonsterZone.findIndex(m => m === null);
-      if (emptySlot < 0 && emz < 0) {
-        addLog('No available Monster Zone or Extra Monster Zone after using the selected materials.');
+      const emz = extraCard.extraKind === 'LINK' && isP1 && prev.extraMonsterZone[0] === null ? 0 : -1;
+      if (extraCard.extraKind === 'LINK' ? emz < 0 : emptySlot < 0) {
+        addLog(extraCard.extraKind === 'LINK'
+          ? 'Your Link Zone is occupied. Free your Player Extra Zone before Link Summoning.'
+          : 'Fusion, Synchro and Xyz monsters must have an available Main Monster Zone in this simulator.');
         return prev;
       }
 
@@ -1484,19 +1628,19 @@ export default function App() {
       if (extraCard.extraKind === 'XYZ') {
         resolvedMaterials.forEach(mat => { if (mat) summoned.materials.push(mat); });
       }
-      if (emptySlot >= 0) curP.monsters[emptySlot] = summoned;
-
       const nextExtraZones = [...prev.extraMonsterZone];
-      if (emptySlot < 0 && emz >= 0) nextExtraZones[emz] = summoned;
+      if (extraCard.extraKind === 'LINK') nextExtraZones[emz] = summoned;
+      else curP.monsters[emptySlot] = summoned;
       if (isOnlineMatch) {
         multiplayer.syncAction('SUMMON', {
           cardName: extraCard.name,
-          slotIndex: emptySlot >= 0 ? emptySlot : 0,
+          slotIndex: extraCard.extraKind === 'LINK' ? 5 : emptySlot,
           faceUp: true,
           position: 'ATTACK',
         });
       }
       succeeded = true;
+      addLog(`SPECIAL SUMMON! [${extraCard.name}] (${extraCard.extraKind}) descends onto the field!`);
       return {
         ...prev,
         player: isP1 ? curP : prev.player,
@@ -1504,8 +1648,6 @@ export default function App() {
         extraMonsterZone: nextExtraZones,
       };
     });
-    // State updates are queued; modal validates the selection before calling this handler.
-    addLog(`SPECIAL SUMMON! [${extraCard.name}] (${extraCard.extraKind}) descends onto the field!`);
   };
 
   // Combat Execution (Targeted Monster or Direct Attack)
@@ -1517,9 +1659,36 @@ export default function App() {
     const attacker = attackingPlayer.monsters.find(m => m && m.uid === attackerUid);
     if (!attacker) return;
 
+    // Strict combat validation: stale UI clicks must never bypass the normal direct-attack rule.
+    if (state.phase !== 'BATTLE' || state.over || attacker.faceUp !== true || attacker.position !== 'ATTACK' || attacker.hasAttacked) {
+      addLog('Attack cancelled: this monster cannot attack right now.');
+      return;
+    }
+    if (targetUid === null) {
+      // Extra Monster Zones are monsters too. Never permit a direct attack while
+      // any opposing Monster Zone or Extra Monster Zone is occupied, unless the
+      // attacker's card text explicitly grants direct attacks.
+      const defenderHasMonster = defendingPlayer.monsters.some(Boolean) ||
+        (state.extraMonsterZone || []).some((m, idx) => Boolean(m) && (isP1 ? idx === 1 : idx === 0));
+      const cardText = attacker.text || '';
+      const explicitlyAllowsDirectAttack = /can attack directly|can make a direct attack/i.test(cardText) && !/cannot attack directly/i.test(cardText);
+      if (defenderHasMonster && !explicitlyAllowsDirectAttack) {
+        addLog('Direct Attack cancelled: your opponent controls a monster. Select an opponent monster as the attack target.');
+        return;
+      }
+    } else {
+      // A targeted attack is only valid if that target still exists on the opposing field.
+      const targetExists = defendingPlayer.monsters.some(m => m?.uid === targetUid) ||
+        (state.extraMonsterZone || []).some((m, idx) => Boolean(m) && m.uid === targetUid && (isP1 ? idx === 1 : idx === 0));
+      if (!targetExists) {
+        addLog('Attack cancelled: the selected target is no longer on the opponent field.');
+        return;
+      }
+    }
+
     // Ask the human player before activating a previously Set attack-response Trap.
     if (!isP1) {
-      const trap = state.player.spells.find(c => c && c.uid !== skipTrapUid && !c.faceUp && c.setTurn !== state.turn &&
+      const trap = state.player.spells.find(c => c && c.uid !== skipTrapUid && !c.faceUp && (c.setTurn ?? -1) < state.turn &&
         (/Mirror Force|Magic Cylinder|Dimensional Prison/i.test(c.name)));
       if (trap) {
         setPendingTrapPrompt({ trapUid: trap.uid, attackerUid, targetUid, trapName: trap.name });
@@ -1529,7 +1698,7 @@ export default function App() {
 
     // CPU Trap response: a previously Set Mirror Force activates when the player declares an attack.
     if (isP1) {
-      const mirrorForceIdx = state.ai.spells.findIndex(c => c && !c.faceUp && /mirror force/i.test(c.name));
+      const mirrorForceIdx = state.ai.spells.findIndex(c => c && !c.faceUp && (c.setTurn ?? -1) < state.turn && /mirror force/i.test(c.name));
       if (mirrorForceIdx >= 0) {
         setState(prev => {
           const ai = { ...prev.ai, spells: [...prev.ai.spells], monsters: [...prev.ai.monsters], graveyard: [...prev.ai.graveyard] };
@@ -1562,11 +1731,15 @@ export default function App() {
       const marshmallonFlipDamage = target.name === 'Marshmallon' && !target.faceUp ? 1000 : 0;
 
       setState(prev => {
-        const attP = isP1 ? { ...prev.player } : { ...prev.ai };
-        const defP = isP1 ? { ...prev.ai } : { ...prev.player };
-
+        const attP = isP1
+          ? { ...prev.player, monsters: [...prev.player.monsters] }
+          : { ...prev.ai, monsters: [...prev.ai.monsters] };
+        const defP = isP1
+          ? { ...prev.ai, monsters: [...prev.ai.monsters], graveyard: [...prev.ai.graveyard] }
+          : { ...prev.player, monsters: [...prev.player.monsters], graveyard: [...prev.player.graveyard] };
         const attMonster = attP.monsters.find(m => m && m.uid === attackerUid);
-        if (attMonster) attMonster.hasAttacked = true;
+        if (!attMonster || attMonster.hasAttacked || !attMonster.faceUp || attMonster.position !== 'ATTACK') return prev;
+        attMonster.hasAttacked = true;
 
         if (target.position === 'ATTACK') {
           if (diff > 0) {
@@ -1651,11 +1824,14 @@ export default function App() {
       // DIRECT ATTACK
       const totalAtk = (attacker.atk ?? 0) + (attacker.attackBonus || 0);
       setState(prev => {
-        const attP = isP1 ? { ...prev.player } : { ...prev.ai };
+        const attP = isP1 ? { ...prev.player, monsters: [...prev.player.monsters] } : { ...prev.ai, monsters: [...prev.ai.monsters] };
         const defP = isP1 ? { ...prev.ai } : { ...prev.player };
-
-        const attMonster = attP.monsters.find(m => m && m.uid === attackerUid);
-        if (attMonster) attMonster.hasAttacked = true;
+        const stillHasDefender = defP.monsters.some(Boolean) || (prev.extraMonsterZone || []).some((m, idx) => Boolean(m) && (isP1 ? idx === 1 : idx === 0));
+        const currentAttacker = attP.monsters.find(m => m && m.uid === attackerUid);
+        const currentText = currentAttacker?.text || '';
+        const directAllowed = /can attack directly|can make a direct attack/i.test(currentText) && !/cannot attack directly/i.test(currentText);
+        if (!currentAttacker || currentAttacker.hasAttacked || !currentAttacker.faceUp || currentAttacker.position !== 'ATTACK' || (stillHasDefender && !directAllowed)) return prev;
+        currentAttacker.hasAttacked = true;
 
         defP.lp = Math.max(0, defP.lp - totalAtk);
 

@@ -44,7 +44,10 @@ export const ExtraDeckModal: React.FC<ExtraDeckModalProps> = ({
     }
     if (extra.extraKind === 'XYZ') {
       const rank = extra.level || 4;
-      return materials.length === 2 && materials.every(m => (m.level || 0) === rank);
+      const materialText = (extra.materialText || '').toLowerCase();
+      const countMatch = materialText.match(/\b(\d+)\s+(?:level\s+\d+\s+)?(?:monsters?|materials?)/);
+      const requiredCount = countMatch ? Number(countMatch[1]) : 2;
+      return materials.length === requiredCount && materials.every(m => (m.level || 0) === rank);
     }
     if (extra.extraKind === 'LINK') {
       const rating = extra.linkRating || 2;
@@ -72,8 +75,14 @@ export const ExtraDeckModal: React.FC<ExtraDeckModalProps> = ({
       if (name.includes('chimeratech megafleet dragon'))
         return materials.length >= 2 && materials.some(m => /Cyber Dragon/i.test(m.name));
       if (name.includes('elemental hero bubbleman')) return materials.length === 2 && materials.some(m => /Bubbleman/i.test(m.name));
-      // The database does not encode exact requirements for every Fusion card; use the common two-material rule.
-      return materials.length >= 2;
+      if (/hero/i.test(extra.name) && /hero/i.test(extra.materialText || '')) {
+        const needed = Number(((extra.materialText || '').match(/\b(\d+)\s+(?:elemental\s+)?heroes?/i) || [])[1] || 2);
+        return materials.length === needed && materials.every(m => /HERO/i.test(m.name));
+      }
+      // For generic Fusion entries, enforce the material count stated by the card text when available.
+      const countMatch = (extra.materialText || '').match(/\b(\d+)\s+(?:or more\s+)?(?:monsters?|materials?)/i);
+      const requiredCount = countMatch ? Number(countMatch[1]) : 2;
+      return materials.length === requiredCount && materials.length >= 2;
     }
     return false;
   };
@@ -81,7 +90,11 @@ export const ExtraDeckModal: React.FC<ExtraDeckModalProps> = ({
   const couldSummon = (extra: CardInstance) => {
     const pool = extra.extraKind === 'FUSION' ? [...fieldMonsters, ...handMonsters] : fieldMonsters;
     if (extra.extraKind === 'SYNCHRO') return pool.some(m => m.tuner) && pool.some(m => !m.tuner) && pool.reduce((n, m) => n + (m.level || 0), 0) >= (extra.level || 0);
-    if (extra.extraKind === 'XYZ') return pool.filter(m => (m.level || 0) === (extra.level || 4)).length >= 2;
+    if (extra.extraKind === 'XYZ') {
+      const countMatch = (extra.materialText || '').toLowerCase().match(/\b(\d+)\s+(?:level\s+\d+\s+)?(?:monsters?|materials?)/);
+      const requiredCount = countMatch ? Number(countMatch[1]) : 2;
+      return pool.filter(m => (m.level || 0) === (extra.level || 4)).length >= requiredCount;
+    }
     if (extra.extraKind === 'LINK') return pool.filter(m => m.subtype !== 'Normal').length >= (extra.linkRating || 2);
     if (extra.extraKind === 'FUSION') return pool.length >= 2;
     return false;
