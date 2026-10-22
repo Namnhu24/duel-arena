@@ -354,7 +354,8 @@ export const BattlefieldOverlay: React.FC<BattlefieldOverlayProps> = ({
                         <div className="absolute -top-3 -right-2 bg-amber-400 text-stone-950 rounded-full p-1 shadow-lg">
                           <Swords className="w-3.5 h-3.5 fill-current" />
                         </div>
-                      </div>
+                      )}
+                    </div>
                     ) : (
                       <div aria-label="Your face-down monster" className="w-full h-full rounded-sm border border-amber-400/70 bg-[radial-gradient(ellipse_at_center,#31517a_0%,#172744_58%,#091321_100%)] flex items-center justify-center rotate-90 scale-90 shadow-inner overflow-hidden">
                         <div className="w-[82%] h-[88%] rounded-sm border border-amber-300/50 bg-[repeating-linear-gradient(45deg,rgba(224,183,75,.12),rgba(224,183,75,.12)_3px,transparent_3px,transparent_7px)] flex items-center justify-center">
