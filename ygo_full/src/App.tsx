@@ -157,6 +157,7 @@ export default function App() {
   const [isMuted, setIsMuted] = useState(false);
   const [pendingSelection, setPendingSelection] = useState<{ title: string; description: string; candidates: { card: CardInstance; source: 'hand' | 'deck' | 'playerGY' | 'aiGY' | 'field' }[]; effect: 'DROPSIES' | 'REBORN' | 'HONEST_NEOS' | 'ROCKSIES_BANISH' | 'DISCARD_FOR_FARIS' | 'DISCARD_FOR_APPRENTICE' } | null>(null);
   const [pendingTrapPrompt, setPendingTrapPrompt] = useState<{ trapUid: number; attackerUid: number; targetUid: number | null; trapName: string } | null>(null);
+  const [pendingQuickEffectPrompt, setPendingQuickEffectPrompt] = useState<{ card: CardInstance; source: 'hand' | 'field'; attackerUid: number; targetUid: number | null } | null>(null);
 
   // Tribute Selection Modal State
   const [tributeState, setTributeState] = useState<{
@@ -1299,7 +1300,12 @@ export default function App() {
   };
 
   // Change Position
-  const handleChangePosition = (card: CardInstance) => {
+  const handleChangePosition = (card: CardInstance, ownerSide: 'player' | 'ai' = state.activeSide) => {
+    // Only the currently active duelist may change the battle position of their own monsters.
+    if (ownerSide !== state.activeSide) {
+      addLog('You can only change the battle position of your own monsters during your turn.');
+      return;
+    }
     if (card.hasChangedPosition) {
       addLog('This monster has already changed its battle position this turn.');
       return;
@@ -1651,7 +1657,7 @@ export default function App() {
   };
 
   // Combat Execution (Targeted Monster or Direct Attack)
-  const executeAttack = (attackerUid: number, targetUid: number | null, skipTrapUid: number | null = null) => {
+  const executeAttack = (attackerUid: number, targetUid: number | null, skipTrapUid: number | null = null, skipQuickUid: number | null = null) => {
     const isP1 = state.activeSide === 'player';
     const attackingPlayer = isP1 ? state.player : state.ai;
     const defendingPlayer = isP1 ? state.ai : state.player;
@@ -1686,10 +1692,23 @@ export default function App() {
       }
     }
 
+    // During the CPU's turn, offer eligible player Quick Effects from hand/field before resolving combat.
+    if (!isP1) {
+      const quickHand = state.player.hand.find(c => c.uid !== skipQuickUid && c.type === 'MONSTER' && (c.isQuickEffect || c.hasHandEffect) && /quick effect|during your opponent.?s turn|when your opponent.?s monster declares an attack/i.test(c.text));
+      const quickField = state.player.monsters.find(c => c && c.uid !== skipQuickUid && c.faceUp && (c.isQuickEffect || /quick effect|during your opponent.?s turn/i.test(c.text)));
+      const quickCard = quickHand || quickField;
+      if (quickCard) {
+        setPendingQuickEffectPrompt({ card: quickCard, source: quickHand ? 'hand' : 'field', attackerUid, targetUid });
+        // Do not resolve the attack until the player answers the effect prompt.
+        setPendingTrapPrompt(null);
+        return;
+      }
+    }
+
     // Ask the human player before activating a previously Set attack-response Trap.
     if (!isP1) {
       const trap = state.player.spells.find(c => c && c.uid !== skipTrapUid && !c.faceUp && (c.setTurn ?? -1) < state.turn &&
-        (/Mirror Force|Magic Cylinder|Dimensional Prison/i.test(c.name)));
+        (/when an opponent.?s monster declares an attack|when your opponent.?s monster declares an attack|when an opponent.?s monster attacks|when your opponent.?s monster attacks/i.test(c.text) || /Mirror Force|Magic Cylinder|Dimensional Prison/i.test(c.name)));
       if (trap) {
         setPendingTrapPrompt({ trapUid: trap.uid, attackerUid, targetUid, trapName: trap.name });
         return;
@@ -1775,18 +1794,20 @@ export default function App() {
             sound.playDestroy();
           }
         } else {
-          // Defense Position: the attacker loses LP equal to DEF - ATK when weaker;
-          // stronger ATK destroys the defender (unless protected), but causes no LP damage.
-          if (diff > 0 && !target.indestructibleByBattle) {
+          // DEFENSE battle: the defender's controller NEVER takes battle damage.
+          // Compare ATK against DEF; only the attacker loses LP when ATK is lower.
+          const defenderDEF = (target.def ?? 0) + (target.defenseBonus || 0);
+          const attackerATK = (attMonster.atk ?? 0) + (attMonster.attackBonus || 0);
+          if (attackerATK > defenderDEF && !target.indestructibleByBattle) {
             const tIdx = defP.monsters.findIndex(m => m && m.uid === targetUid);
             if (tIdx >= 0) {
               const dest = defP.monsters[tIdx]!; defP.monsters[tIdx] = null; defP.graveyard.push(dest);
             }
             sound.playDestroy();
-          } else if (diff < 0) {
-            attP.lp = Math.max(0, attP.lp + diff);
+          } else if (attackerATK < defenderDEF) {
+            attP.lp = Math.max(0, attP.lp - (defenderDEF - attackerATK));
           }
-          // Flip a face-down defense monster face-up after damage calculation.
+          // Flip a face-down Defense Position monster face-up only after damage calculation.
           const flipped = defP.monsters.find(m => m && m.uid === targetUid);
           if (flipped) flipped.faceUp = true;
         }
@@ -1860,6 +1881,21 @@ export default function App() {
     }
   };
 
+  const resolveQuickEffectPrompt = (activate: boolean) => {
+    const prompt = pendingQuickEffectPrompt;
+    if (!prompt) return;
+    setPendingQuickEffectPrompt(null);
+    if (!activate) {
+      addLog(`You chose not to activate [${prompt.card.name}].`);
+      executeAttack(prompt.attackerUid, prompt.targetUid, null, prompt.card.uid);
+      return;
+    }
+    addLog(`You chose to activate [${prompt.card.name}] in response to the CPU's action.`);
+    if (prompt.source === 'hand') handleActivateHandEffect(prompt.card);
+    else handleActivateMonsterSkill(prompt.card);
+    executeAttack(prompt.attackerUid, prompt.targetUid, null, prompt.card.uid);
+  };
+
   const resolveTrapPrompt = (activate: boolean) => {
     const prompt = pendingTrapPrompt;
     if (!prompt) return;
@@ -1888,14 +1924,25 @@ export default function App() {
         if (idx >= 0) { const [removed] = ai.monsters.splice(idx, 1); if (removed) ai.banished.push(removed); }
         return { ...prev, player, ai, selectedAttackerUid: null };
       }
-      return { ...prev, player, selectedAttackerUid: null };
+      // For any other attack-response Trap with an executable effect, run its actual callback.
+      const ai = { ...prev.ai, monsters: [...prev.ai.monsters], spells: [...prev.ai.spells], graveyard: [...prev.ai.graveyard], banished: [...(prev.ai.banished || [])] };
+      const effectCard = idx >= 0 ? player.graveyard[player.graveyard.length - 1] : null;
+      if (effectCard?.activateEffect) {
+        try { effectCard.activateEffect({ card: effectCard, owner: player, opponent: ai, ownerSide: 'player', gameState: prev, target: ai.monsters.find(m => m?.uid === prompt.attackerUid) || null, log: addLog }); }
+        catch (error) { addLog(`[${prompt.trapName}] effect failed: ${String(error)}`); }
+      }
+      return { ...prev, player, ai, selectedAttackerUid: null };
     });
     if (prompt.trapName === 'Magic Cylinder') {
       const attacker = state.ai.monsters.find(m => m?.uid === prompt.attackerUid);
       const damage = attacker ? (attacker.atk || 0) + (attacker.attackBonus || 0) : 0;
       setState(prev => ({ ...prev, ai: { ...prev.ai, lp: Math.max(0, prev.ai.lp - damage) } }));
       addLog(`[Magic Cylinder] negated the attack and reflected ${damage} damage!`);
-    } else addLog(`[${prompt.trapName}] activated! The attack was stopped.`);
+    } else if (/Mirror Force|Dimensional Prison/i.test(prompt.trapName)) {
+      addLog(`[${prompt.trapName}] activated! The attack was stopped or the attacker was removed.`);
+    } else {
+      addLog(`[${prompt.trapName}] activated in response to the attack.`);
+    }
     sound.playEffectChime();
   };
 
@@ -1939,7 +1986,7 @@ export default function App() {
         actions.push({
           label: card.faceUp ? 'Change Battle Position' : 'Flip Summon',
           desc: card.faceUp ? `Switch to ${card.position === 'ATTACK' ? 'Defense' : 'Attack'} Position` : 'Flip face-up into Attack Position',
-          run: () => handleChangePosition(card),
+          run: () => handleChangePosition(card, side),
         });
 
         if (card.activateEffect) {
@@ -2140,9 +2187,14 @@ export default function App() {
         onEndTurn={handleEndTurn}
         onInspectCard={(c) => setState(prev => ({ ...prev, selectedCardUid: c.uid }))}
         onDirectAttack={() => {
-          if (state.selectedAttackerUid) {
-            executeAttack(state.selectedAttackerUid, null);
+          if (!state.selectedAttackerUid) return;
+          const selectedAttacker = state.player.monsters.find(m => m?.uid === state.selectedAttackerUid);
+          if (state.activeSide !== 'player' || !selectedAttacker || selectedAttacker.hasAttacked || !selectedAttacker.faceUp || selectedAttacker.position !== 'ATTACK') {
+            setState(prev => ({ ...prev, selectedAttackerUid: null }));
+            addLog('Direct Attack cancelled: select an eligible monster that has not attacked this turn.');
+            return;
           }
+          executeAttack(state.selectedAttackerUid, null);
         }}
       />
 
@@ -2153,7 +2205,7 @@ export default function App() {
           onActivateEffect={handleActivateMonsterSkill}
           onActivateHandEffect={handleActivateHandEffect}
           onActivateGyEffect={handleActivateGyEffect}
-          location="field"
+          location={selectedCard && state.player.hand.some(c => c.uid === selectedCard.uid) ? 'hand' : 'field'}
         />
       </div>
 
@@ -2356,6 +2408,20 @@ export default function App() {
         }}
         onCancel={() => setTributeState(null)}
       />
+
+      {pendingQuickEffectPrompt && (
+        <div className="fixed inset-0 z-[125] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-cyan-400/70 bg-[#081525] p-6 shadow-[0_0_50px_rgba(34,211,238,.22)]">
+            <h2 className="font-['Orbitron'] text-cyan-200 font-black tracking-widest">QUICK EFFECT</h2>
+            <p className="text-slate-200 mt-3">CPU đang thực hiện hành động. Bạn có muốn kích hoạt hiệu ứng <strong>[{pendingQuickEffectPrompt.card.name}]</strong> từ {pendingQuickEffectPrompt.source === 'hand' ? 'tay' : 'sân'} không?</p>
+            <p className="text-xs text-slate-400 mt-2">{pendingQuickEffectPrompt.card.text}</p>
+            <div className="flex gap-3 mt-5">
+              <button onClick={() => resolveQuickEffectPrompt(true)} className="flex-1 rounded-lg bg-cyan-600 hover:bg-cyan-500 px-4 py-3 font-bold text-white">Activate Effect</button>
+              <button onClick={() => resolveQuickEffectPrompt(false)} className="flex-1 rounded-lg bg-slate-700 hover:bg-slate-600 px-4 py-3 font-bold text-white">No, continue</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {pendingTrapPrompt && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">

@@ -154,7 +154,8 @@ export const BattlefieldOverlay: React.FC<BattlefieldOverlayProps> = ({
                 key={idx}
                 onClick={() => {
                   if (card) {
-                    onInspectCard(card);
+                    // Face-down monsters must not reveal their identity through the inspector.
+                    if (card.faceUp) onInspectCard(card);
                     onCardClick(card, 'ai', 'monsters', idx);
                   } else if (isP2Turn) {
                     onZoneClick('ai', 'monsters', idx);
@@ -314,7 +315,8 @@ export const BattlefieldOverlay: React.FC<BattlefieldOverlayProps> = ({
                 key={idx}
                 onClick={() => {
                   if (card) {
-                    onInspectCard(card);
+                    // Do not expose a Set monster's art/name until it is flipped face-up.
+                    if (card.faceUp) onInspectCard(card);
                     onCardClick(card, 'player', 'monsters', idx);
                   } else if (isP1Turn) {
                     onZoneClick('player', 'monsters', idx);
@@ -335,24 +337,31 @@ export const BattlefieldOverlay: React.FC<BattlefieldOverlayProps> = ({
                 }`}
               >
                 {card ? (
-                  <div className="relative w-full h-full">
-                    <img
-                      src={card.art}
-                      alt={card.name}
-                      className={`w-full h-full object-contain rounded ${
-                        card.position === 'DEFENSE' ? 'rotate-90 scale-90' : ''
-                      }`}
-                    />
-                    <div className="absolute bottom-0 left-0 right-0 bg-black/90 px-1 py-0.5 text-[8px] font-['Orbitron'] font-black text-center leading-tight">
-                      <span className="text-amber-300">ATK {(card.atk ?? 0) + (card.attackBonus || 0)}</span>
-                      {card.subtype !== 'Link' && <span className="text-sky-300 ml-1">DEF {(card.def ?? 0) + (card.defenseBonus || 0)}</span>}
-                    </div>
-                    {isSelectedAttacker && (
-                      <div className="absolute -top-3 -right-2 bg-amber-400 text-stone-950 rounded-full p-1 shadow-lg">
-                        <Swords className="w-3.5 h-3.5 fill-current" />
+                  card.faceUp ? (
+                    <div className="relative w-full h-full">
+                      <img
+                        src={card.art}
+                        alt={card.name}
+                        className={`w-full h-full object-contain rounded ${
+                          card.position === 'DEFENSE' ? 'rotate-90 scale-90' : ''
+                        }`}
+                      />
+                      <div className="absolute bottom-0 left-0 right-0 bg-black/90 px-1 py-0.5 text-[8px] font-['Orbitron'] font-black text-center leading-tight">
+                        <span className="text-amber-300">ATK {(card.atk ?? 0) + (card.attackBonus || 0)}</span>
+                        {card.subtype !== 'Link' && <span className="text-sky-300 ml-1">DEF {(card.def ?? 0) + (card.defenseBonus || 0)}</span>}
                       </div>
-                    )}
-                  </div>
+                      {isSelectedAttacker && (
+                        <div className="absolute -top-3 -right-2 bg-amber-400 text-stone-950 rounded-full p-1 shadow-lg">
+                          <Swords className="w-3.5 h-3.5 fill-current" />
+                        </div>
+                      </div>
+                    ) : (
+                      <div aria-label="Your face-down monster" className="w-full h-full rounded-sm border border-amber-400/70 bg-[radial-gradient(ellipse_at_center,#31517a_0%,#172744_58%,#091321_100%)] flex items-center justify-center rotate-90 scale-90 shadow-inner overflow-hidden">
+                        <div className="w-[82%] h-[88%] rounded-sm border border-amber-300/50 bg-[repeating-linear-gradient(45deg,rgba(224,183,75,.12),rgba(224,183,75,.12)_3px,transparent_3px,transparent_7px)] flex items-center justify-center">
+                          <div className="w-7 h-7 rounded-full border border-sky-300/60 bg-[#071426]/80 shadow-[0_0_10px_rgba(56,189,248,.3)]" />
+                        </div>
+                      </div>
+                    )
                 ) : (
                   <span className="text-[9px] font-['Orbitron'] text-stone-400">MONSTER {idx + 1}</span>
                 )}
