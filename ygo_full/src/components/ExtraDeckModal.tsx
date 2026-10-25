@@ -39,7 +39,8 @@ export const ExtraDeckModal: React.FC<ExtraDeckModalProps> = ({
   const checkCanSummon = (extra: CardInstance, materials: CardInstance[]) => {
     if (!extra.extraKind || materials.length === 0 || new Set(materials.map(m => m.uid)).size !== materials.length) return false;
     if (extra.extraKind === 'SYNCHRO') {
-      return materials.length >= 2 && materials.some(m => m.tuner) && materials.some(m => !m.tuner)
+      const isTuner = (m: CardInstance) => Boolean(m.tuner || /\btuner\b/i.test(m.text || '') || /tuner/i.test(m.subtype || ''));
+      return materials.length >= 2 && materials.some(isTuner) && materials.some(m => !isTuner(m))
         && materials.reduce((sum, m) => sum + (m.level || 0), 0) === (extra.level || 0);
     }
     if (extra.extraKind === 'XYZ') {
@@ -89,7 +90,10 @@ export const ExtraDeckModal: React.FC<ExtraDeckModalProps> = ({
 
   const couldSummon = (extra: CardInstance) => {
     const pool = extra.extraKind === 'FUSION' ? [...fieldMonsters, ...handMonsters] : fieldMonsters;
-    if (extra.extraKind === 'SYNCHRO') return pool.some(m => m.tuner) && pool.some(m => !m.tuner) && pool.reduce((n, m) => n + (m.level || 0), 0) >= (extra.level || 0);
+    if (extra.extraKind === 'SYNCHRO') {
+      const isTuner = (m: CardInstance) => Boolean(m.tuner || /\btuner\b/i.test(m.text || '') || /tuner/i.test(m.subtype || ''));
+      return pool.some(isTuner) && pool.some(m => !isTuner(m)) && pool.reduce((n, m) => n + (m.level || 0), 0) >= (extra.level || 0);
+    }
     if (extra.extraKind === 'XYZ') {
       const countMatch = (extra.materialText || '').toLowerCase().match(/\b(\d+)\s+(?:level\s+\d+\s+)?(?:monsters?|materials?)/);
       const requiredCount = countMatch ? Number(countMatch[1]) : 2;

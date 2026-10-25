@@ -1707,8 +1707,9 @@ export default function App() {
 
     // Ask the human player before activating a previously Set attack-response Trap.
     if (!isP1) {
-      const trap = state.player.spells.find(c => c && c.uid !== skipTrapUid && !c.faceUp && (c.setTurn ?? -1) < state.turn &&
-        (/when an opponent.?s monster declares an attack|when your opponent.?s monster declares an attack|when an opponent.?s monster attacks|when your opponent.?s monster attacks/i.test(c.text) || /Mirror Force|Magic Cylinder|Dimensional Prison/i.test(c.name)));
+      const attackResponseNames = /Mirror Force|Magic Cylinder|Dimensional Prison|Sakuretsu Armor|Negate Attack|Scrap-Iron Scarecrow/i;
+      const trap = state.player.spells.find(c => c && c.uid !== skipTrapUid && c.type === 'TRAP' && !c.faceUp && (c.setTurn ?? -1) < state.turn &&
+        (/when an opponent.?s monster declares an attack|when your opponent.?s monster declares an attack|when an opponent.?s monster attacks|when your opponent.?s monster attacks|attack is declared/i.test(c.text) || attackResponseNames.test(c.name)));
       if (trap) {
         setPendingTrapPrompt({ trapUid: trap.uid, attackerUid, targetUid, trapName: trap.name });
         return;
@@ -1924,6 +1925,15 @@ export default function App() {
         if (idx >= 0) { const [removed] = ai.monsters.splice(idx, 1); if (removed) ai.banished.push(removed); }
         return { ...prev, player, ai, selectedAttackerUid: null };
       }
+      if (/Sakuretsu Armor/i.test(prompt.trapName)) {
+        const ai = { ...prev.ai, monsters: [...prev.ai.monsters], graveyard: [...prev.ai.graveyard] };
+        const idx = ai.monsters.findIndex(m => m?.uid === prompt.attackerUid);
+        if (idx >= 0) { const [removed] = ai.monsters.splice(idx, 1); if (removed) ai.graveyard.push(removed); }
+        return { ...prev, player, ai, selectedAttackerUid: null };
+      }
+      if (/Negate Attack|Scrap-Iron Scarecrow/i.test(prompt.trapName)) {
+        return { ...prev, player, selectedAttackerUid: null };
+      }
       // For any other attack-response Trap with an executable effect, run its actual callback.
       const ai = { ...prev.ai, monsters: [...prev.ai.monsters], spells: [...prev.ai.spells], graveyard: [...prev.ai.graveyard], banished: [...(prev.ai.banished || [])] };
       const effectCard = idx >= 0 ? player.graveyard[player.graveyard.length - 1] : null;
@@ -1938,10 +1948,10 @@ export default function App() {
       const damage = attacker ? (attacker.atk || 0) + (attacker.attackBonus || 0) : 0;
       setState(prev => ({ ...prev, ai: { ...prev.ai, lp: Math.max(0, prev.ai.lp - damage) } }));
       addLog(`[Magic Cylinder] negated the attack and reflected ${damage} damage!`);
-    } else if (/Mirror Force|Dimensional Prison/i.test(prompt.trapName)) {
+    } else if (/Mirror Force|Dimensional Prison|Sakuretsu Armor|Negate Attack|Scrap-Iron Scarecrow/i.test(prompt.trapName)) {
       addLog(`[${prompt.trapName}] activated! The attack was stopped or the attacker was removed.`);
     } else {
-      addLog(`[${prompt.trapName}] activated in response to the attack.`);
+      addLog(`[${prompt.trapName}] activated in response to the attack. This card's specific effect may need a dedicated rule implementation.`);
     }
     sound.playEffectChime();
   };
