@@ -30,11 +30,18 @@ export const ExtraDeckModal: React.FC<ExtraDeckModalProps> = ({
   if (!isOpen) return null;
 
   // Fusion materials may come from hand or field; Synchro/Xyz/Link use face-up field monsters.
-  const fieldMonsters = player.monsters.filter((m): m is CardInstance => m !== null && m.faceUp);
+  // Fusion Materials can include face-down monsters on the field; other Extra Deck
+  // summons in this simulator require face-up field monsters.
+  const allFieldMonsters = player.monsters.filter((m): m is CardInstance => m !== null);
+  const faceUpFieldMonsters = allFieldMonsters.filter(m => m.faceUp);
   const handMonsters = player.hand.filter((m) => m.type === 'MONSTER');
+  // Fusion materials are selectable from BOTH the hand and the field.
+  // Other Extra Deck types in this simulator use face-up monsters on the field only.
   const candidateMaterials = selectedExtraCard?.extraKind === 'FUSION'
-    ? [...fieldMonsters, ...handMonsters]
-    : fieldMonsters;
+    ? [...allFieldMonsters, ...handMonsters]
+    : faceUpFieldMonsters;
+  const isInHand = (uid: number) => handMonsters.some(m => m.uid === uid);
+  const isOnField = (uid: number) => allFieldMonsters.some(m => m.uid === uid);
 
   const checkCanSummon = (extra: CardInstance, materials: CardInstance[]) => {
     if (!extra.extraKind || materials.length === 0 || new Set(materials.map(m => m.uid)).size !== materials.length) return false;
@@ -89,7 +96,7 @@ export const ExtraDeckModal: React.FC<ExtraDeckModalProps> = ({
   };
 
   const couldSummon = (extra: CardInstance) => {
-    const pool = extra.extraKind === 'FUSION' ? [...fieldMonsters, ...handMonsters] : fieldMonsters;
+    const pool = extra.extraKind === 'FUSION' ? [...allFieldMonsters, ...handMonsters] : faceUpFieldMonsters;
     if (extra.extraKind === 'SYNCHRO') {
       const isTuner = (m: CardInstance) => Boolean(m.tuner || /\btuner\b/i.test(m.text || '') || /tuner/i.test(m.subtype || ''));
       return pool.some(isTuner) && pool.some(m => !isTuner(m)) && pool.reduce((n, m) => n + (m.level || 0), 0) >= (extra.level || 0);
@@ -223,6 +230,9 @@ export const ExtraDeckModal: React.FC<ExtraDeckModalProps> = ({
                         </div>
                         <span className="font-bold text-[10px] text-stone-200 truncate w-full text-center">
                           {m.name}
+                        </span>
+                        <span className="text-[9px] text-sky-300">
+                          {isInHand(m.uid) ? 'FROM HAND' : isOnField(m.uid) ? 'ON FIELD' : ''}
                         </span>
                         <span className="text-[9px] text-sky-400">
                           Lv.{m.level || 0} {m.tuner ? '(Tuner)' : ''}

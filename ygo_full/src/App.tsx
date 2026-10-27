@@ -1403,9 +1403,13 @@ export default function App() {
       ai: isP1 ? opponentCopy : ownerCopy,
     }));
     if (effectResult && typeof (effectResult as Promise<unknown>).then === 'function') {
-      (effectResult as Promise<unknown>).then(commitEffectState).catch(err => addLog(`[${card.name}] Effect failed: ${String(err)}`));
+      (effectResult as Promise<unknown>).then(() => {
+        commitEffectState();
+        if (card.name === 'Polymerization') setIsExtraOpen(true);
+      }).catch(err => addLog(`[${card.name}] Effect failed: ${String(err)}`));
     } else {
       commitEffectState();
+      if (card.name === 'Polymerization') setIsExtraOpen(true);
     }
 
     if (isOnlineMatch) {
@@ -1558,7 +1562,7 @@ export default function App() {
       const extraIdx = curP.extraDeck.findIndex(c => c.uid === extraCard.uid);
       if (extraIdx < 0) return prev;
 
-      const fieldMaterials = materialUids.map(uid => curP.monsters.find(m => m?.uid === uid && m.faceUp)).filter((m): m is CardInstance => Boolean(m));
+      const fieldMaterials = materialUids.map(uid => curP.monsters.find(m => m?.uid === uid && (extraCard.extraKind === 'FUSION' || m.faceUp))).filter((m): m is CardInstance => Boolean(m));
       const handMaterials = materialUids.map(uid => curP.hand.find(m => m.uid === uid && m.type === 'MONSTER')).filter((m): m is CardInstance => Boolean(m));
       const resolvedMaterials = materialUids.map(uid => fieldMaterials.find(m => m.uid === uid) || (extraCard.extraKind === 'FUSION' ? handMaterials.find(m => m.uid === uid) : undefined));
       if (resolvedMaterials.some(m => !m) || resolvedMaterials.length !== materialUids.length) {
@@ -1591,7 +1595,7 @@ export default function App() {
       } else if (extraCard.extraKind === 'FUSION') {
         const name = extraCard.name.toLowerCase();
         let valid = mats.length >= 2;
-        if (name.includes('blue-eyes ultimate')) valid = mats.length === 3 && mats.every(m => m.name === 'Blue-Eyes White Dragon');
+        if (name.includes('blue-eyes ultimate')) valid = mats.length === 3 && mats.every(m => m.name.trim().toLowerCase() === 'blue-eyes white dragon');
         else if (name.includes('flame wingman')) valid = mats.length === 2 && mats.some(m => /Avian/i.test(m.name)) && mats.some(m => /Burstinatrix/i.test(m.name));
         else if (name.includes('cyber twin dragon')) valid = mats.length === 2 && mats.every(m => /Cyber Dragon/i.test(m.name));
         else if (name.includes('cyber end dragon')) valid = mats.length === 3 && mats.every(m => /Cyber Dragon/i.test(m.name));
