@@ -2195,27 +2195,83 @@ export default function App() {
     );
   }
 
-  // A Fusion Spell in hand glows when a Fusion target and its materials are available.
+  // Polymerization glows only when at least one Fusion Monster in the Extra Deck
+  // has all required materials available across the player's hand and field.
   const fusionMaterialPool = [
     ...state.player.monsters.filter((m): m is CardInstance => m !== null),
     ...state.player.hand.filter(m => m.type === 'MONSTER'),
   ];
   const normalizedCardName = (name: string) => name.trim().replace(/\s+/g, ' ').toLowerCase();
-  const fusionTargetReady = state.player.extraDeck.some(extra => {
+  const canMakeFusion = (extra: CardInstance): boolean => {
     if (extra.extraKind !== 'FUSION') return false;
     const name = normalizedCardName(extra.name);
+    const pool = fusionMaterialPool;
+    const count = (re: RegExp) => pool.filter(m => re.test(m.name)).length;
+    const heroCount = (re: RegExp = /hero/i) => pool.filter(m => re.test(m.name)).length;
+    const has = (re: RegExp) => pool.some(m => re.test(m.name));
+
+    // Explicit material names / known card families.
     if (name.includes('blue-eyes ultimate dragon') || name.includes('neo blue-eyes ultimate dragon'))
-      return fusionMaterialPool.filter(m => normalizedCardName(m.name) === 'blue-eyes white dragon').length >= 3;
+      return count(/^blue-eyes white dragon$/i) >= 3;
     if (name.includes('flame wingman'))
-      return fusionMaterialPool.some(m => /avian/i.test(m.name)) && fusionMaterialPool.some(m => /burstinatrix/i.test(m.name));
-    if (name.includes('cyber twin dragon')) return fusionMaterialPool.filter(m => /cyber dragon/i.test(m.name)).length >= 2;
-    if (name.includes('cyber end dragon')) return fusionMaterialPool.filter(m => /cyber dragon/i.test(m.name)).length >= 3;
-    if (/hero/i.test(extra.name) && /hero/i.test(extra.materialText || ''))
-      return fusionMaterialPool.filter(m => /hero/i.test(m.name)).length >= 2;
-    return fusionMaterialPool.length >= 2;
-  });
+      return has(/avian/i) && has(/burstinatrix/i);
+    if (name.includes('cyber twin dragon')) return count(/cyber dragon/i) >= 2;
+    if (name.includes('cyber end dragon')) return count(/cyber dragon/i) >= 3;
+    if (name.includes('prank-kids rocket ride') || name.includes('prank-kids weather washer'))
+      return count(/prank-kids/i) >= 2;
+    if (name.includes('elemental hero sunrise')) {
+      const heroes = pool.filter(m => /hero/i.test(m.name));
+      return heroes.some(a => heroes.some(b => a.uid !== b.uid && a.attribute !== b.attribute));
+    }
+    if (name.includes('elemental hero absolute zero'))
+      return pool.some(m => /hero/i.test(m.name)) && pool.some(m => m.attribute === 'WATER');
+    if (name.includes('elemental hero the shining'))
+      return pool.some(m => /elemental hero/i.test(m.name)) && pool.some(m => m.attribute === 'LIGHT');
+    if (name.includes('elemental hero escuridao'))
+      return pool.some(m => /elemental hero/i.test(m.name)) && pool.some(m => m.attribute === 'DARK');
+    if (name.includes('elemental hero gaia'))
+      return pool.some(m => /hero/i.test(m.name)) && pool.some(m => m.attribute === 'EARTH');
+    if (name.includes('destiny hero - dystopia') || name.includes('destiny hero - dangerous'))
+      return count(/destiny hero/i) >= 2;
+    if (name.includes('vision hero trinity')) return count(/hero/i) >= 3;
+    if (name.includes('vision hero adoration') || name.includes('xtra hero cross crusader') || name.includes('xtra hero wonder driver'))
+      return count(/hero/i) >= 2;
+    if (name.includes('xtra hero dread decimator')) return count(/hero/i) >= 2;
+
+    // Generic material-text support. If the text specifies named materials, all
+    // named requirements must be present; otherwise use common archetype/attribute rules.
+    const text = (extra.materialText || '').toLowerCase();
+    if (!text || /must be special summoned by|contact fusion/i.test(text)) return false;
+    const namedRequirements = [...(extra.materialText || '').matchAll(/(?:\d+\s+)?(?:"([^\"]+)"|“([^”]+)”)/g)]
+      .map(m => (m[1] || m[2] || '').trim()).filter(Boolean);
+    if (namedRequirements.length) {
+      const requiredCount = Math.max(2, Number((text.match(/^(\d+)/) || [])[1] || 2));
+      return namedRequirements.every(req => count(new RegExp(req.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i')) > 0)
+        && pool.length >= requiredCount;
+    }
+    const heroReq = text.match(/(\d+)\s+(?:elemental\s+)?(?:destiny\s+|vision\s+)?hero monsters?/i);
+    if (heroReq) return heroCount(/hero/i) >= Number(heroReq[1]);
+    const prankReq = text.match(/(\d+)\s+"?prank-kids"? monsters?/i);
+    if (prankReq) return count(/prank-kids/i) >= Number(prankReq[1]);
+    const attributeReq = [...text.matchAll(/\b(light|dark|water|fire|earth|wind|divine)\s+monster\b/gi)].map(m => m[1].toUpperCase());
+    if (attributeReq.length) {
+      const used = new Set<number>();
+      for (const attr of attributeReq) {
+        const candidate = pool.find(m => m.attribute?.toUpperCase() === attr && !used.has(m.uid));
+        if (!candidate) return false;
+        used.add(candidate.uid);
+      }
+      return true;
+    }
+    // For generic “2 monsters” text, require at least two actual monster materials.
+    const genericCount = text.match(/(\d+)\+?\s+(?:effect\s+)?monsters?/i);
+    if (genericCount) return pool.length >= Number(genericCount[1]);
+    return false;
+  };
+  const fusionTargetReady = state.player.hand.some(c => normalizedCardName(c.name) === 'polymerization')
+    && state.player.extraDeck.some(canMakeFusion);
   const fusionReadyCardUids = fusionTargetReady
-    ? state.player.hand.filter(c => ['polymerization', 'power bond'].includes(normalizedCardName(c.name))).map(c => c.uid)
+    ? state.player.hand.filter(c => normalizedCardName(c.name) === 'polymerization').map(c => c.uid)
     : [];
 
   // Active player hand determination
