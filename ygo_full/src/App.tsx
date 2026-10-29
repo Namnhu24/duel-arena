@@ -151,6 +151,8 @@ export default function App() {
   const [isGyOpen, setIsGyOpen] = useState(false);
   const [gyOwnerSide, setGyOwnerSide] = useState<'player' | 'ai'>('player');
   const [isExtraOpen, setIsExtraOpen] = useState(false);
+  // Keep Polymerization in hand until a Fusion Summon actually succeeds.
+  const [pendingFusionSpellUid, setPendingFusionSpellUid] = useState<number | null>(null);
   const [actionCard, setActionCard] = useState<CardInstance | null>(null);
   const [actionList, setActionList] = useState<CardActionItem[]>([]);
   const [pendingSummonChoice, setPendingSummonChoice] = useState<CardInstance | null>(null);
@@ -1361,6 +1363,16 @@ export default function App() {
       return;
     }
 
+    // Polymerization is a cost-free activation in this simulator: do not send it to the GY
+    // until a Fusion Summon succeeds. If the player cancels or the summon validation fails,
+    // the Spell remains in hand and can be activated again.
+    if (card.name === 'Polymerization' && isP1) {
+      setPendingFusionSpellUid(card.uid);
+      addLog('[Polymerization] Activated. Choose a Fusion Monster and valid materials; this Spell goes to the GY only after a successful Fusion Summon.');
+      setIsExtraOpen(true);
+      return;
+    }
+
     // Resolve effects against cloned duelists, then commit the mutations to React state.
     // Previously callbacks changed stale state objects, so many implemented card effects only logged text.
     const clonePlayer = (source: PlayerState): PlayerState => ({
@@ -1595,13 +1607,22 @@ export default function App() {
       } else if (extraCard.extraKind === 'FUSION') {
         const name = extraCard.name.toLowerCase();
         let valid = mats.length >= 2;
-        if (name.includes('blue-eyes ultimate')) valid = mats.length === 3 && mats.every(m => m.name.trim().toLowerCase() === 'blue-eyes white dragon');
+        if (name.includes('blue-eyes ultimate')) valid = mats.length === 3 && mats.every(m => m.name.trim().replace(/\s+/g, ' ').toLowerCase() === 'blue-eyes white dragon');
         else if (name.includes('flame wingman')) valid = mats.length === 2 && mats.some(m => /Avian/i.test(m.name)) && mats.some(m => /Burstinatrix/i.test(m.name));
         else if (name.includes('cyber twin dragon')) valid = mats.length === 2 && mats.every(m => /Cyber Dragon/i.test(m.name));
         else if (name.includes('cyber end dragon')) valid = mats.length === 3 && mats.every(m => /Cyber Dragon/i.test(m.name));
         else if (name.includes('rocket ride') || name.includes('weather washer')) valid = mats.length === 2 && mats.every(m => /Prank-Kids/i.test(m.name));
         else if (/hero/i.test(name) && /hero/i.test(materialText)) valid = mats.length === 2 && mats.every(m => /HERO/i.test(m.name));
         if (!valid) { addLog(`Fusion Summon cancelled: the selected materials do not match [${extraCard.name}]'s requirements.`); return prev; }
+      }
+
+      // All validations and destination-zone checks have passed. Only now consume the
+      // pending Polymerization, so a failed/cancelled Fusion never sends it to the GY.
+      if (extraCard.extraKind === 'FUSION' && pendingFusionSpellUid !== null) {
+        const spellIdx = curP.hand.findIndex(c => c.uid === pendingFusionSpellUid && c.name === 'Polymerization');
+        if (spellIdx >= 0) {
+          curP.graveyard.push(curP.hand.splice(spellIdx, 1)[0]);
+        }
       }
 
       // Remove the selected materials first so they can free space on a full field.
@@ -1658,6 +1679,11 @@ export default function App() {
         extraMonsterZone: nextExtraZones,
       };
     });
+    // React state updates are queued; success is set synchronously inside the updater in normal
+    // React event handling. Clear the pending spell only after the summon path reports success.
+    if (succeeded && extraCard.extraKind === 'FUSION' && pendingFusionSpellUid !== null) {
+      setPendingFusionSpellUid(null);
+    }
   };
 
   // Combat Execution (Targeted Monster or Direct Attack)
@@ -2169,6 +2195,29 @@ export default function App() {
     );
   }
 
+  // A Fusion Spell in hand glows when a Fusion target and its materials are available.
+  const fusionMaterialPool = [
+    ...state.player.monsters.filter((m): m is CardInstance => m !== null),
+    ...state.player.hand.filter(m => m.type === 'MONSTER'),
+  ];
+  const normalizedCardName = (name: string) => name.trim().replace(/\s+/g, ' ').toLowerCase();
+  const fusionTargetReady = state.player.extraDeck.some(extra => {
+    if (extra.extraKind !== 'FUSION') return false;
+    const name = normalizedCardName(extra.name);
+    if (name.includes('blue-eyes ultimate dragon') || name.includes('neo blue-eyes ultimate dragon'))
+      return fusionMaterialPool.filter(m => normalizedCardName(m.name) === 'blue-eyes white dragon').length >= 3;
+    if (name.includes('flame wingman'))
+      return fusionMaterialPool.some(m => /avian/i.test(m.name)) && fusionMaterialPool.some(m => /burstinatrix/i.test(m.name));
+    if (name.includes('cyber twin dragon')) return fusionMaterialPool.filter(m => /cyber dragon/i.test(m.name)).length >= 2;
+    if (name.includes('cyber end dragon')) return fusionMaterialPool.filter(m => /cyber dragon/i.test(m.name)).length >= 3;
+    if (/hero/i.test(extra.name) && /hero/i.test(extra.materialText || ''))
+      return fusionMaterialPool.filter(m => /hero/i.test(m.name)).length >= 2;
+    return fusionMaterialPool.length >= 2;
+  });
+  const fusionReadyCardUids = fusionTargetReady
+    ? state.player.hand.filter(c => ['polymerization', 'power bond'].includes(normalizedCardName(c.name))).map(c => c.uid)
+    : [];
+
   // Active player hand determination
   const activeHand = state.player.hand;
   const activeDuelistName = state.player.name;
@@ -2269,6 +2318,7 @@ export default function App() {
         ownerName={activeDuelistName}
         isLocal2P={false}
         activeSide="player"
+        fusionReadyCardUids={fusionReadyCardUids}
       />
 
       {/* 6. STATUS LOG BANNER */}

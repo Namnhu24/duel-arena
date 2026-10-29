@@ -3,7 +3,7 @@
  * Fusion, Synchro, Xyz, Link summoning procedures with material checks.
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { CardInstance, PlayerState } from '../types/duel';
 import { Layers, X, Sparkles, Zap, Shield } from 'lucide-react';
 import { sound } from '../utils/audio';
@@ -26,6 +26,14 @@ export const ExtraDeckModal: React.FC<ExtraDeckModalProps> = ({
 }) => {
   const [selectedExtraCard, setSelectedExtraCard] = useState<CardInstance | null>(null);
   const [selectedMaterialUids, setSelectedMaterialUids] = useState<number[]>([]);
+
+  useEffect(() => {
+    if (selectedExtraCard && !player.extraDeck.some(c => c.uid === selectedExtraCard.uid)) {
+      setSelectedExtraCard(null);
+      setSelectedMaterialUids([]);
+      onClose();
+    }
+  }, [player.extraDeck, selectedExtraCard, onClose]);
 
   if (!isOpen) return null;
 
@@ -67,7 +75,7 @@ export const ExtraDeckModal: React.FC<ExtraDeckModalProps> = ({
     if (extra.extraKind === 'FUSION') {
       const name = extra.name.toLowerCase();
       if (name.includes('blue-eyes ultimate dragon') || name.includes('neo blue-eyes ultimate dragon'))
-        return materials.length === 3 && materials.every(m => m.name === 'Blue-Eyes White Dragon');
+        return materials.length === 3 && materials.every(m => m.name.trim().replace(/\s+/g, ' ').toLowerCase() === 'blue-eyes white dragon');
       if (name.includes('flame wingman'))
         return materials.length === 2 && materials.some(m => /Avian/i.test(m.name)) && materials.some(m => /Burstinatrix/i.test(m.name));
       if (name.includes('rocket ride'))
@@ -121,7 +129,7 @@ export const ExtraDeckModal: React.FC<ExtraDeckModalProps> = ({
     if (!selectedExtraCard) return;
     sound.playSpecialSummon();
     onSummonExtraMonster(selectedExtraCard, selectedMaterialUids);
-    onClose();
+    // Parent closes this modal only after the summon succeeds and the card leaves Extra Deck.
   };
 
   const chosenMaterials = candidateMaterials.filter(m => selectedMaterialUids.includes(m.uid));

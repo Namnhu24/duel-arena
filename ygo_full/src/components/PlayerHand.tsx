@@ -15,6 +15,7 @@ interface PlayerHandProps {
   ownerName?: string;
   isLocal2P?: boolean;
   activeSide?: 'player' | 'ai';
+  fusionReadyCardUids?: number[];
 }
 
 export const PlayerHand: React.FC<PlayerHandProps> = ({
@@ -25,6 +26,7 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
   ownerName = 'DUELIST',
   isLocal2P = false,
   activeSide = 'player',
+  fusionReadyCardUids = [],
 }) => {
   const [isCurtainHidden, setIsCurtainHidden] = useState(false);
   const total = hand.length;
@@ -78,6 +80,7 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
             const rotDeg = (i - mid) * 3.5;
             const dy = Math.abs(i - mid) ** 1.6 * 2;
             const hasHandSkill = card.hasHandEffect;
+            const fusionReady = fusionReadyCardUids.includes(card.uid);
 
             return (
               <div
@@ -95,12 +98,21 @@ export const PlayerHand: React.FC<PlayerHandProps> = ({
                   zIndex: isSelected ? 40 : i + 10,
                 }}
                 className={`relative cursor-pointer transition-all duration-200 hover:-translate-y-8 hover:scale-115 hover:z-50 ${
-                  hasHandSkill
-                    ? 'ring-2 ring-amber-400 shadow-[0_0_18px_rgba(250,200,60,0.8)]'
-                    : 'hover:ring-2 hover:ring-sky-400'
+                  fusionReady
+                    ? 'ring-2 ring-fuchsia-300 shadow-[0_0_26px_rgba(217,70,239,1)] animate-pulse scale-105'
+                    : hasHandSkill
+                      ? 'ring-2 ring-amber-400 shadow-[0_0_18px_rgba(250,200,60,0.8)]'
+                      : 'hover:ring-2 hover:ring-sky-400'
                 }`}
               >
                 {/* Hand Effect Glowing Badge */}
+                {fusionReady && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-30 flex items-center gap-0.5 bg-gradient-to-r from-fuchsia-500 to-pink-300 text-slate-950 px-1.5 py-0.5 rounded-full text-[9px] font-['Orbitron'] font-black shadow-[0_0_18px_rgba(217,70,239,.9)] animate-pulse whitespace-nowrap">
+                    <Zap className="w-2.5 h-2.5 fill-current" />
+                    <span>FUSION READY</span>
+                  </div>
+                )}
+
                 {hasHandSkill && (
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-0.5 bg-gradient-to-r from-amber-500 to-yellow-400 text-stone-950 px-1.5 py-0.5 rounded-full text-[9px] font-['Orbitron'] font-black shadow-lg animate-pulse whitespace-nowrap">
                     <Zap className="w-2.5 h-2.5 fill-current" />
